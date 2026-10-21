@@ -8,9 +8,9 @@ export type Side = 'red' | 'blue'
 export type PieceType = 'explorer' | 'vanguard' | 'sentinel'
 
 export const PIECE_STATS: Record<PieceType, { movement: number; strength: number; letter: string; name: string; shape: string }> = {
-  explorer: { movement: 5, strength: 1, letter: 'E', name: 'Explorer', shape: 'Pentagon cone' },
-  vanguard: { movement: 4, strength: 2, letter: 'V', name: 'Vanguard', shape: 'Diamond wedge' },
-  sentinel: { movement: 3, strength: 3, letter: 'S', name: 'Sentinel', shape: 'Triangular prism' },
+  explorer: { movement: 5, strength: 1, letter: 'E', name: 'Explorer', shape: 'Needle · 5-sided base' },
+  vanguard: { movement: 4, strength: 2, letter: 'V', name: 'Vanguard', shape: 'Wedge · square base' },
+  sentinel: { movement: 3, strength: 3, letter: 'S', name: 'Sentinel', shape: 'Tower · 3-sided base' },
 }
 
 // Not stated on the rules page ({{count}} placeholder); unverified.

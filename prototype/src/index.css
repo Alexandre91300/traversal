@@ -146,6 +146,20 @@ h1, h2, h3 {
   75% { content: '...'; }
 }
 
+/* Turn banner: pops when the turn changes; glows while it's yours. */
+.turn-pop { animation: turn-pop 0.45s ease-out; }
+@keyframes turn-pop {
+  /* transform only: Tailwind's centring uses the separate `translate` property. */
+  0% { transform: translateY(-6px) scale(0.85); opacity: 0; }
+  60% { transform: translateY(0) scale(1.06); opacity: 1; }
+  100% { transform: none; }
+}
+.turn-glow { box-shadow: 0 0 0 0 rgb(129 182 76 / 0.7), 0 10px 25px rgb(0 0 0 / 0.45); animation: turn-pop 0.45s ease-out, turn-glow 1.8s ease-out 0.45s infinite; }
+@keyframes turn-glow {
+  0% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55), 0 10px 25px rgb(0 0 0 / 0.45); }
+  100% { box-shadow: 0 0 0 14px rgb(255 255 255 / 0), 0 10px 25px rgb(0 0 0 / 0.45); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }

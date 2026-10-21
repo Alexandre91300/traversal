@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { PIECE_STATS, FILES, forward, type GameState, type Move, type Piece, type Pos } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
 
@@ -27,6 +28,7 @@ interface BoardProps {
   showCoords?: boolean
   showcase?: boolean
   highlight?: Pos[] // pulsing Squares, e.g. a tutorial goal
+  ghost?: boolean // the selected Piece can't move now: its targets are shown for information only
   onPieceClick?: (p: Piece) => void
   onMove?: (m: Move) => void
   onHover?: (m: Move | null) => void
@@ -50,7 +52,7 @@ export function Board3D(props: BoardProps) {
   )
 }
 
-function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, showHeights, showCoords, showcase, highlight = [], onPieceClick, onMove, onHover }: BoardProps) {
+function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, showHeights, showCoords, showcase, highlight = [], ghost = false, onPieceClick, onMove, onHover }: BoardProps) {
   const controls = useRef<CameraControls>(null)
   const { heights } = state
   const maxH = Math.max(1, ...heights.flat())
@@ -129,7 +131,7 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
 
       {targets.map(m => (
         <Target key={`${m.kind}-${m.to.x}-${m.to.y}`} heights={heights} move={m} piece={selected!}
-          active={hovered === m} onMove={onMove} onHover={onHover} />
+          active={hovered === m} ghost={ghost} onMove={onMove} onHover={onHover} />
       ))}
 
       {state.pieces.map(p => (
@@ -237,19 +239,70 @@ function Pulse({ heights, p }: { heights: Heights; p: Pos }) {
   )
 }
 
+// Piece silhouettes, readable at a glance like chess pieces: each says what
+// the Piece does, Strength shows as white pips (1, 2, 3), and the base keeps
+// the original design's rule that its number of sides is the Movement.
+//   Explorer  needle: tall and thin, fast and fragile (5-sided)
+//   Vanguard  wedge aimed at the enemy: the charge (square base)
+//   Sentinel  crenellated tower: slow, strongest, wins by Finishing first (3-sided)
+// Every model stands on y = 0 and faces Red's forward (-z); Blue's is turned round.
 const geoms = {
-  explorer: new THREE.ConeGeometry(0.31, 0.78, 5),
-  sentinel: new THREE.CylinderGeometry(0.34, 0.34, 0.62, 3),
-  vanguard: (() => {
-    const s = new THREE.Shape()
-    s.moveTo(-0.3, 0); s.lineTo(0.3, 0); s.lineTo(0, 0.6); s.closePath()
-    const g = new THREE.ExtrudeGeometry(s, { depth: 0.56, bevelEnabled: false })
-    g.translate(0, -0.3, -0.28)
-    g.rotateY(Math.PI / 4)
+  explorer: (() => {
+    const g = new THREE.CylinderGeometry(0.035, 0.2, 0.9, 5)
+    g.translate(0, 0.45, 0)
     return g
   })(),
+  vanguard: (() => {
+    // Side profile in (z, y): high at the back, low at the front.
+    const s = new THREE.Shape()
+    s.moveTo(-0.34, 0); s.lineTo(0.3, 0); s.lineTo(0.3, 0.7); s.lineTo(-0.34, 0.04); s.closePath()
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.56, bevelEnabled: false })
+    g.rotateY(-Math.PI / 2)
+    g.translate(0.28, 0, 0)
+    return g
+  })(),
+  sentinel: (() => {
+    const body = new THREE.CylinderGeometry(0.4, 0.44, 0.5, 3)
+    body.translate(0, 0.25, 0)
+    const parts = [0, 1, 2].map(i => {
+      const a = (i * 2 * Math.PI) / 3
+      const m = new THREE.BoxGeometry(0.17, 0.15, 0.17)
+      m.rotateY(a)
+      m.translate(Math.sin(a) * 0.27, 0.575, Math.cos(a) * 0.27)
+      return m
+    })
+    return mergeGeometries([body, ...parts])
+  })(),
 }
-const pieceLift = { explorer: 0.39, sentinel: 0.31, vanguard: 0.3 }
+const pipGeom = new THREE.SphereGeometry(0.068, 16, 12)
+const PIPS: Record<Piece['type'], [number, number, number][]> = {
+  explorer: [[0, 0.93, 0]],
+  // On the slope, nudged out along its normal so they sit proud of it.
+  vanguard: [[-0.14, 0.4, 0.03], [0.14, 0.4, 0.03]],
+  sentinel: [0, 1, 2].map(i => {
+    const a = (i * 2 * Math.PI) / 3 + Math.PI / 3
+    return [Math.sin(a) * 0.13, 0.5, Math.cos(a) * 0.13] as [number, number, number]
+  }),
+}
+
+function PieceModel({ type, side, selected = false, transparent = false }: {
+  type: Piece['type']; side: Piece['side']; selected?: boolean; transparent?: boolean
+}) {
+  const color = PIECE_COLORS[side]
+  return (
+    <group rotation-y={side === 'blue' ? Math.PI : 0}>
+      <mesh geometry={geoms[type]} castShadow>
+        <meshStandardMaterial color={color} roughness={0.38} metalness={0.15} transparent={transparent}
+          emissive={selected ? color : '#000'} emissiveIntensity={selected ? 0.35 : 0} />
+      </mesh>
+      {PIPS[type].map((p, i) => (
+        <mesh key={i} geometry={pipGeom} position={p}>
+          <meshStandardMaterial color="#ffffff" roughness={0.3} emissive="#ffffff" emissiveIntensity={0.25} transparent={transparent} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
 
 function PieceMesh({ piece, heights, selected, onClick, onOver }: {
   piece: Piece; heights: Heights; selected: boolean
@@ -257,7 +310,7 @@ function PieceMesh({ piece, heights, selected, onClick, onOver }: {
 }) {
   const ref = useRef<THREE.Group>(null)
   const [wx, wz] = world(piece.x, piece.y)
-  const target = new THREE.Vector3(wx, topY(heights, piece) + pieceLift[piece.type], wz)
+  const target = new THREE.Vector3(wx, topY(heights, piece) + 0.005, wz)
   const init = useRef(target.clone())
   // Ground position eased toward the target; the hop is added on top each
   // frame rather than accumulated, so it settles at any frame rate.
@@ -274,21 +327,17 @@ function PieceMesh({ piece, heights, selected, onClick, onOver }: {
     const s = selected ? 1.12 : 1
     g.scale.lerp(new THREE.Vector3(s, s, s), k)
   })
-  const color = PIECE_COLORS[piece.side]
   return (
-    <group ref={ref} position={init.current}>
-      <mesh geometry={geoms[piece.type]} castShadow onClick={onClick}
-        onPointerOver={e => { e.stopPropagation(); document.body.style.cursor = 'pointer'; onOver() }}
-        onPointerOut={() => { document.body.style.cursor = '' }}>
-        <meshStandardMaterial color={color} roughness={0.38} metalness={0.15}
-          emissive={selected ? color : '#000'} emissiveIntensity={selected ? 0.35 : 0} />
-      </mesh>
+    <group ref={ref} position={init.current} onClick={onClick}
+      onPointerOver={e => { e.stopPropagation(); document.body.style.cursor = 'pointer'; onOver() }}
+      onPointerOut={() => { document.body.style.cursor = '' }}>
+      <PieceModel type={piece.type} side={piece.side} selected={selected} />
     </group>
   )
 }
 
-function Target({ heights, move, piece, active, onMove, onHover }: {
-  heights: Heights; move: Move; piece: Piece; active: boolean
+function Target({ heights, move, piece, active, ghost, onMove, onHover }: {
+  heights: Heights; move: Move; piece: Piece; active: boolean; ghost: boolean
   onMove?: (m: Move) => void; onHover?: (m: Move | null) => void
 }) {
   const [wx, wz] = world(move.to.x, move.to.y)
@@ -310,6 +359,7 @@ function Target({ heights, move, piece, active, onMove, onHover }: {
     : cap ? { background: cap.allowed ? '#e2563f' : '#5a5650', color: '#fff' }
     : special ? { background: '#e8b83e', color: '#2b2310' }
     : { background: 'rgba(24,23,20,0.88)', color: '#f2eee6' }
+  const dim = ghost ? 0.5 : 1
 
   if (finish) {
     const z = wz - forward(piece.side) * 0.95
@@ -317,9 +367,9 @@ function Target({ heights, move, piece, active, onMove, onHover }: {
       <group position={[wx, y + 0.25, z]}>
         <mesh rotation-x={piece.side === 'red' ? -Math.PI / 2 : Math.PI / 2} {...handlers}>
           <coneGeometry args={[0.28, 0.5, 4]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.6 : 0.25} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.6 : 0.25} transparent opacity={dim} />
         </mesh>
-        <Html center wrapperClass="html3d" zIndexRange={[20, 0]}><div className="badge3d" style={badgeStyle}>{label}</div></Html>
+        <Html center wrapperClass="html3d" zIndexRange={[20, 0]}><div className="badge3d" style={{ ...badgeStyle, opacity: dim }}>{label}</div></Html>
       </group>
     )
   }
@@ -329,7 +379,7 @@ function Target({ heights, move, piece, active, onMove, onHover }: {
         {cap || special
           ? <ringGeometry args={[cap ? 0.36 : 0.2, cap ? 0.47 : 0.3, 32]} />
           : <circleGeometry args={[active ? 0.2 : 0.16, 32]} />}
-        <meshBasicMaterial color={color} transparent opacity={active ? 0.95 : 0.8} depthWrite={false} />
+        <meshBasicMaterial color={color} transparent opacity={(active ? 0.95 : 0.8) * dim} depthWrite={false} />
       </mesh>
       {/* Generous invisible hit area so small markers are easy to tap. */}
       <mesh rotation-x={-Math.PI / 2} position-y={0.01} {...handlers}>
@@ -337,7 +387,7 @@ function Target({ heights, move, piece, active, onMove, onHover }: {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       <Html center position={[0, 0.05, 0]} wrapperClass="html3d" zIndexRange={[20, 0]}>
-        <div className="badge3d" style={{ ...badgeStyle, outline: active ? '2px solid #fff' : undefined }}>{label}</div>
+        <div className="badge3d" style={{ ...badgeStyle, opacity: dim, outline: active ? '2px solid #fff' : undefined }}>{label}</div>
       </Html>
     </group>
   )
@@ -430,36 +480,40 @@ const EXIT_SECONDS = 1.2
 function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDone: () => void }) {
   const { piece, kind } = exit
   const group = useRef<THREE.Group>(null)
-  const mat = useRef<THREE.MeshStandardMaterial>(null)
   const ring = useRef<THREE.Mesh>(null)
   const ringMat = useRef<THREE.MeshBasicMaterial>(null)
   const t = useRef(0)
   const ended = useRef(false)
   const [wx, wz] = world(piece.x, piece.y)
   const ground = topY(heights, piece)
-  const y0 = ground + pieceLift[piece.type]
+  const y0 = ground + 0.005
   const dir = -forward(piece.side) // world z runs opposite to rank
   const accent = kind === 'finish' ? '#f5d547' : '#ff6b4a'
 
   useFrame((_, dt) => {
     const k = (t.current += dt)
     const g = group.current
-    if (g && mat.current) {
+    // Body and pips fade and flash together.
+    const mats: THREE.MeshStandardMaterial[] = []
+    g?.traverse(o => { if (o instanceof THREE.Mesh) mats.push(o.material as THREE.MeshStandardMaterial) })
+    const setAll = (f: (m: THREE.MeshStandardMaterial) => void) => mats.forEach(f)
+    if (g) {
       if (kind === 'capture') {
         // Hold while the attacker lands, flash, then spin down into the ground.
         const s = k < 0.22 ? 1 : Math.max(0.001, 1 - (k - 0.22) / 0.35)
         g.scale.setScalar(s)
         g.position.set(wx, y0 - (1 - s) * 0.3, wz)
         g.rotation.y = Math.max(0, k - 0.22) * 9
-        mat.current.emissiveIntensity = k > 0.18 && k < 0.45 ? 1.2 : 0
+        const flash = k > 0.18 && k < 0.45
+        setAll(m => { m.emissive.set('#ffffff'); m.emissiveIntensity = flash ? 1.2 : 0 })
       } else {
         // Glide past the goal edge, lifting off and fading.
         const a = Math.min(1, k / 0.8)
         const e = a * a * (3 - 2 * a)
         g.position.set(wx, y0 + e * 0.9, wz + dir * e * 1.3)
         g.scale.setScalar(1 - e * 0.35)
-        mat.current.opacity = 1 - Math.min(1, Math.max(0, (k - 0.45) / 0.5))
-        mat.current.emissiveIntensity = 0.5 * e
+        const opacity = 1 - Math.min(1, Math.max(0, (k - 0.45) / 0.5))
+        setAll(m => { m.opacity = opacity; m.emissive.set('#f5d547'); m.emissiveIntensity = 0.5 * e })
       }
     }
     if (ring.current && ringMat.current) {
@@ -478,10 +532,7 @@ function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDon
   return (
     <>
       <group ref={group} position={[wx, y0, wz]}>
-        <mesh geometry={geoms[piece.type]} castShadow>
-          <meshStandardMaterial ref={mat} color={PIECE_COLORS[piece.side]} roughness={0.38} metalness={0.15}
-            emissive={kind === 'finish' ? '#f5d547' : '#ffffff'} emissiveIntensity={0} transparent />
-        </mesh>
+        <PieceModel type={piece.type} side={piece.side} transparent />
       </group>
       <mesh ref={ring} position={ringAt} rotation-x={-Math.PI / 2} renderOrder={3}>
         <ringGeometry args={[0.38, 0.48, 40]} />
