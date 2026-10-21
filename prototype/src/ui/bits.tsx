@@ -1,15 +1,18 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { LEVELS, type Level } from '../game/ai'
+import type { Level } from '../game/ai'
 import type { PieceType, Side } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
+import { useT } from '../i18n'
 
-export const SIDE_LABEL: Record<Side, string> = { red: 'Red', blue: 'Blue' }
-export const SIDE_PLAYER: Record<Side, string> = { red: 'Player 1', blue: 'Player 2' }
 export const SIDE_HEX: Record<Side, string> = { red: '#e2563f', blue: '#4b8fe8' }
 
 // Against the computer the human is always Red (see HUMAN in useGame).
-export const playerNames = (computer?: Level): Record<Side, string> =>
-  computer ? { red: 'You', blue: `Computer · ${LEVELS[computer].name}` } : SIDE_PLAYER
+export function usePlayerNames(computer?: Level): Record<Side, string> {
+  const t = useT()
+  return computer
+    ? { red: t('you'), blue: t('computer.named', { level: t(`level.${computer}`) }) }
+    : { red: t('player.1'), blue: t('player.2') }
+}
 
 // Side views of the 3D models: needle, wedge, tower, with Strength pips.
 const SILHOUETTES: Record<PieceType, { body: string; pips: [number, number][] }> = {
@@ -93,9 +96,10 @@ export function Logo({ className = '' }: { className?: string }) {
 }
 
 export function ConceptBadge() {
+  const t = useT()
   return (
     <span className="inline-block text-[10px] uppercase tracking-[0.12em] font-display font-bold text-muted border border-line rounded px-1.5 py-0.5">
-      Unofficial UI concept
+      {t('concept')}
     </span>
   )
 }

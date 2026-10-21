@@ -152,7 +152,8 @@ export function useLobby() {
     if (!user || !ids.length) return
     user.profiles(ids).then(ps => setNames(Object.fromEntries(ids.map(id => [id, ps[id]?.name || '']))))
   }, [user, games])
-  const nameOf = (c: Claim | null) => (c?.by && names[c.by]) || 'Someone'
+  // "" when unknown: the caller words the fallback in the viewer's language.
+  const nameOf = (c: Claim | null) => (c?.by && names[c.by]) || ''
   // A seat this viewer's account held on a page that has since gone away
   // (a reload); while that page is still open, it is someone else's seat.
   const vacated = (c: Claim | null) => !!me?.by && c?.by === me.by && !present.has(c.peer)

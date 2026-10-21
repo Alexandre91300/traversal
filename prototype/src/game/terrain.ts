@@ -12,29 +12,28 @@ export type TerrainModeId =
   | 'dunes' | 'jungle' | 'prairies' | 'canyons' | 'rivers' | 'ridges'
   | 'petrified' | 'everest' | 'mariana' | 'inferno'
 
+// Names and blurbs live in i18n.ts.
 export interface TerrainMode {
   id: TerrainModeId
-  name: string
-  blurb: string
 }
 
 export const TERRAIN_MODES: TerrainMode[] = [
-  { id: 'random', name: 'Random', blurb: 'Balanced variety' },
-  { id: 'mountains', name: 'Mountains', blurb: 'Dramatic central peaks' },
-  { id: 'valleys', name: 'Valleys', blurb: 'Deep basins with ridges' },
-  { id: 'highlands', name: 'Highlands', blurb: 'Peaks and basins combined' },
-  { id: 'woodlands', name: 'Woodlands', blurb: 'Mostly flat, gentle hills' },
-  { id: 'desert', name: 'Desert', blurb: 'Flat expanses, rare spikes' },
-  { id: 'dunes', name: 'Dunes', blurb: 'Rolling diagonal waves' },
-  { id: 'jungle', name: 'Jungle', blurb: 'Dense, bumpy ground' },
-  { id: 'prairies', name: 'Prairies', blurb: 'Almost perfectly flat' },
-  { id: 'canyons', name: 'Canyons', blurb: 'A deep gorge to cross' },
-  { id: 'rivers', name: 'Rivers', blurb: 'Winding low channels' },
-  { id: 'ridges', name: 'Ridges', blurb: 'Parallel lanes of high ground' },
-  { id: 'petrified', name: 'Petrified Forest', blurb: 'Scattered stone pillars' },
-  { id: 'everest', name: 'Mount Everest', blurb: 'One giant summit' },
-  { id: 'mariana', name: 'Mariana Trench', blurb: 'One abyssal pit' },
-  { id: 'inferno', name: 'Inferno', blurb: 'Pure chaos' },
+  { id: 'random' },
+  { id: 'mountains' },
+  { id: 'valleys' },
+  { id: 'highlands' },
+  { id: 'woodlands' },
+  { id: 'desert' },
+  { id: 'dunes' },
+  { id: 'jungle' },
+  { id: 'prairies' },
+  { id: 'canyons' },
+  { id: 'rivers' },
+  { id: 'ridges' },
+  { id: 'petrified' },
+  { id: 'everest' },
+  { id: 'mariana' },
+  { id: 'inferno' },
 ]
 
 export function mulberry32(seed: number) {

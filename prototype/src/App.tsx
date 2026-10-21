@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Board3D, type View } from './ui/Board3D'
-import { ConceptBadge, Icon, Logo, playerNames, SIDE_HEX, SIDE_LABEL } from './ui/bits'
+import { ConceptBadge, Icon, Logo, usePlayerNames, SIDE_HEX } from './ui/bits'
+import { useT } from './i18n'
 import { Home } from './ui/Home'
 import { GameOverModal, NewGameModal, RulesModal, randomSeed } from './ui/Modals'
 import { useOnlineSync, type OnlineStatus } from './ui/online'
@@ -50,10 +51,12 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onOnline, onSta
 }) {
   const { state, mySide } = game
   const { computer, online } = game.setup
+  const t = useT()
   const net = useOnlineSync(game)
+  const localNames = usePlayerNames(computer)
   const names = online
-    ? { [online.side]: 'You', [other(online.side)]: net?.opponentName || 'Opponent' } as ReturnType<typeof playerNames>
-    : playerNames(computer)
+    ? { [online.side]: t('you'), [other(online.side)]: net?.opponentName || t('opponent') } as typeof localNames
+    : localNames
   const [settings, setSettings] = useState<Settings>(() => ({ showHeights: true, showCoords: window.innerWidth >= 1024, autoFlip: false }))
   const [view, setView] = useState<View>(mySide ?? 'red')
   const [reviewing, setReviewing] = useState(false)
@@ -90,23 +93,23 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onOnline, onSta
   return (
     <div className="min-h-full lg:h-full flex">
       <nav className="hidden lg:flex flex-col items-center gap-1 w-[104px] bg-rail py-4 shrink-0">
-        <button onClick={onHome} className="mb-4 px-2" aria-label="Home"><Logo className="text-[21px]" /></button>
-        <RailButton icon="plus" label="New game" onClick={onNewGame} />
-        <RailButton icon="book" label="Rules" onClick={onRules} />
-        <RailButton icon="globe" label="Online" onClick={onOnline} />
-        <RailButton icon="learn" label="Learn" onClick={onLearn} />
-        <RailButton icon="home" label="Home" onClick={onHome} />
+        <button onClick={onHome} className="mb-4 px-2" aria-label={t('home')}><Logo className="text-[21px]" /></button>
+        <RailButton icon="plus" label={t('newGame')} onClick={onNewGame} />
+        <RailButton icon="book" label={t('rules')} onClick={onRules} />
+        <RailButton icon="globe" label={t('online')} onClick={onOnline} />
+        <RailButton icon="learn" label={t('learn')} onClick={onLearn} />
+        <RailButton icon="home" label={t('home')} onClick={onHome} />
         <div className="mt-auto px-2 text-center"><ConceptBadge /></div>
       </nav>
 
       <main className="flex-1 min-w-0 flex flex-col lg:flex-row lg:gap-4 lg:p-4">
         <header className="lg:hidden flex items-center gap-2 px-3 py-2 bg-rail">
-          <button onClick={onHome} aria-label="Home"><Logo className="text-2xl" /></button>
+          <button onClick={onHome} aria-label={t('home')}><Logo className="text-2xl" /></button>
           <ConceptBadge />
           <div className="ml-auto flex gap-1">
-            <IconButton icon="globe" label="Play online" onClick={onOnline} />
-            <IconButton icon="book" label="Rules" onClick={onRules} />
-            <IconButton icon="plus" label="New game" onClick={onNewGame} />
+            <IconButton icon="globe" label={t('playOnline')} onClick={onOnline} />
+            <IconButton icon="book" label={t('rules')} onClick={onRules} />
+            <IconButton icon="plus" label={t('newGame')} onClick={onNewGame} />
           </div>
         </header>
 
@@ -135,7 +138,7 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onOnline, onSta
             <TurnBanner game={game} net={net} />
             {state.result && reviewing && (
               <button className="btn btn-primary absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2" onClick={() => setReviewing(false)}>
-                Show result
+                {t('board.showResult')}
               </button>
             )}
           </div>
@@ -175,27 +178,29 @@ function IconButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'globe';
 // Whose turn it is, said loudly above the board; also the waiting and review states.
 function TurnBanner({ game, net }: { game: ReturnType<typeof useGame>; net: OnlineStatus | null }) {
   const { state, mySide } = game
+  const t = useT()
   const box = 'absolute top-2 left-1/2 -translate-x-1/2 w-max max-w-[92%] rounded-full shadow-xl font-display font-bold text-sm px-4 py-2 flex items-center gap-2'
   if (net?.lockedOut) return (
-    <div role="status" className={`${box} bg-surface/95 border border-line`}>This game already has two players. <span className="text-muted font-normal">Create your own from Play online.</span></div>
+    <div role="status" className={`${box} bg-surface/95 border border-line`}>{t('banner.locked')} <span className="text-muted font-normal">{t('banner.lockedHint')}</span></div>
   )
   if (net && !net.opponentHere && !state.result) return (
     <div role="status" className={`${box} bg-surface/95 border border-line flex-col !gap-0 !rounded-xl text-center`}>
-      <span className="thinking">Waiting for your opponent</span>
+      <span className="thinking">{t('banner.waiting')}</span>
       <span className="text-muted text-xs font-normal font-body">
-        {game.log.length ? 'They left the page. The game resumes when they come back.' : 'Share this page with them; your game appears under Play online.'}
+        {t(game.log.length ? 'banner.left' : 'banner.share')}
       </span>
     </div>
   )
   if (game.reviewing) return (
     <div role="status" className={`${box} bg-gold text-[#2b2310]`}>
-      {game.ply ? `Reviewing move ${game.ply} of ${game.plies}` : 'Reviewing the start'}
-      <button className="rounded-full bg-[#2b2310] text-gold px-2.5 py-0.5 text-xs" onClick={() => game.goTo(null)}>Back to live</button>
+      {game.ply ? t('banner.reviewing', { n: game.ply, total: game.plies }) : t('banner.reviewStart')}
+      <button className="rounded-full bg-[#2b2310] text-gold px-2.5 py-0.5 text-xs" onClick={() => game.goTo(null)}>{t('banner.live')}</button>
     </div>
   )
   if (state.result) return null
   const mine = !mySide || state.turn === mySide
-  const label = !mySide ? `${SIDE_LABEL[state.turn]} to move` : mine ? 'Your move' : game.thinking ? 'Computer is thinking' : "Opponent's move"
+  const label = !mySide ? t('banner.toMove', { side: t(`side.${state.turn}`) })
+    : t(mine ? 'banner.yourMove' : game.thinking ? 'banner.computer' : 'banner.opponent')
   return (
     // Keyed on the turn so it pops each time the turn changes hands.
     <div key={state.turn + game.plies} role="status" aria-live="polite"

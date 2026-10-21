@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Html, Line } from '@react-three/drei'
+import CameraControlsImpl from 'camera-controls'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { PIECE_STATS, FILES, forward, type GameState, type Move, type Piece, type Pos } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
+import { useT } from '../i18n'
 
 export const HEIGHT_UNIT = 0.32
 const BASE_Y = -0.7
@@ -38,7 +40,8 @@ interface BoardProps {
 // Fills its nearest positioned ancestor, so flex parents need no definite height.
 export function Board3D(props: BoardProps) {
   return (
-    <div className="absolute inset-0">
+    // Right-drag turns the board, so no browser menu on the canvas.
+    <div className="absolute inset-0" onContextMenu={e => e.preventDefault()}>
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -73,6 +76,17 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
       c.setLookAt(0, center + d * up, z * d * back, 0, center, z * 0.6, true)
     }
   }, [view, viewNonce, maxH, center, aspect])
+
+  // Left click only ever plays; turning the board is a right-drag (touch: one finger).
+  useEffect(() => {
+    const c = controls.current
+    if (!c) return
+    const { ACTION } = CameraControlsImpl
+    c.mouseButtons.left = ACTION.NONE
+    c.mouseButtons.right = ACTION.ROTATE
+    c.mouseButtons.middle = ACTION.DOLLY
+    c.mouseButtons.wheel = ACTION.DOLLY
+  }, [])
 
   useFrame((_, dt) => {
     if (showcase && controls.current) controls.current.azimuthAngle += dt * 0.12
@@ -340,6 +354,7 @@ function Target({ heights, move, piece, active, ghost, onMove, onHover }: {
   heights: Heights; move: Move; piece: Piece; active: boolean; ghost: boolean
   onMove?: (m: Move) => void; onHover?: (m: Move | null) => void
 }) {
+  const t = useT()
   const [wx, wz] = world(move.to.x, move.to.y)
   const y = topY(heights, move.to)
   const cap = move.capture
@@ -351,9 +366,9 @@ function Target({ heights, move, piece, active, ghost, onMove, onHover }: {
     onPointerOver: (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; onHover?.(move) },
     onPointerOut: () => { document.body.style.cursor = ''; onHover?.(null) },
   }
-  const label = finish ? `Finish +${PIECE_STATS[piece.type].strength}`
+  const label = finish ? t('board.finish', { n: PIECE_STATS[piece.type].strength })
     : cap ? `${cap.allowed ? '⚔' : '✕'} ${cap.attack}–${cap.defense}`
-    : special ? (move.kind === 'leap' ? 'Leap' : 'Diagonal')
+    : special ? t(`kind.${move.kind as 'leap' | 'diagonal'}`)
     : String(move.cost)
   const badgeStyle = finish ? { background: '#81b64c', color: '#fff' }
     : cap ? { background: cap.allowed ? '#e2563f' : '#5a5650', color: '#fff' }
@@ -479,6 +494,7 @@ const EXIT_SECONDS = 1.2
 
 function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDone: () => void }) {
   const { piece, kind } = exit
+  const tr = useT()
   const group = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Mesh>(null)
   const ringMat = useRef<THREE.MeshBasicMaterial>(null)
@@ -528,7 +544,7 @@ function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDon
   })
 
   const ringAt: [number, number, number] = [wx, ground + 0.02, kind === 'capture' ? wz : wz + dir * 0.95]
-  const label = kind === 'finish' ? `+${PIECE_STATS[piece.type].strength}` : 'Captured'
+  const label = kind === 'finish' ? `+${PIECE_STATS[piece.type].strength}` : tr('board.captured')
   return (
     <>
       <group ref={group} position={[wx, y0, wz]}>

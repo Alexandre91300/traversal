@@ -15,12 +15,12 @@ function solvable(i: number, s: GameState, depth: number): boolean {
 }
 
 describe('tutorial lessons', () => {
-  it.each(LESSONS.map((l, i) => [l.title, i] as const))('%s can be completed', (_, i) => {
+  it.each(LESSONS.map((l, i) => [l.title.en, i] as const))('%s can be completed', (_, i) => {
     expect(solvable(i, lessonState(LESSONS[i]), 2)).toBe(true)
   })
 
   it('hands the turn back to Red and never ends the game', () => {
-    const l = LESSONS.find(l => l.title === 'Winning')!
+    const l = LESSONS.find(l => l.title.en === 'Winning')!
     const s = lessonState(l)
     const finish = redMoves(s).find(m => m.kind === 'finish' && m.pieceId.startsWith('red-sentinel'))!
     const next = playLesson(s, finish)
