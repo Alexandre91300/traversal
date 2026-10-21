@@ -47,3 +47,5 @@ Mock up 2 or 3 options side by side (an artifact or a screenshot sheet) before r
 - All tests still pass, and capture/Finish effects, selection glow and hop animation still work with the new models.
 
 ## Comments
+
+- 2026-10-21: owner picked the chess-like direction, then the two-tone Staunton, then finish **3B Pierre & bronze** (red jasper / lapis lazuli, bronze bands = Strength, walnut base; no white pips). Wired onto the board in `prototype/src/ui/pieceModel.tsx` (textures in `pieceTextures.ts`, own studio env map so the terrain is untouched); 2D icons and shape labels updated. Alternatives stay in the `#pieces` gallery. Still to judge in play: Explorer vs Vanguard at the default camera, phone size, capture/Finish effects.

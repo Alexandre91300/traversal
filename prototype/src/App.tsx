@@ -6,6 +6,7 @@ import { Home } from './ui/Home'
 import { GameOverModal, NewGameModal, RulesModal, randomSeed } from './ui/Modals'
 import { useOnlineSync, type OnlineStatus } from './ui/online'
 import { OnlineModal } from './ui/OnlineModal'
+import { PieceGallery } from './ui/PieceGallery'
 import { PlayerBar } from './ui/PlayerBar'
 import { SidePanel } from './ui/SidePanel'
 import { Tutorial } from './ui/Tutorial'
@@ -18,6 +19,14 @@ export default function App() {
   const [screen, setScreen] = useState<'home' | 'play' | 'learn'>('home')
   const [overlay, setOverlay] = useState<Overlay>(null)
   const game = useGame({ mode: 'random', seed: randomSeed() })
+  const [hash, setHash] = useState(window.location.hash)
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+  // Dev-only comparison rig for the Piece-redesign issue; not part of the normal game flow.
+  if (hash === '#pieces') return <PieceGallery />
 
   const start = (s: GameSetup) => {
     game.restart(s)

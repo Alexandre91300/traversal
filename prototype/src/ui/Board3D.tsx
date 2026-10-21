@@ -3,10 +3,11 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Html, Line } from '@react-three/drei'
 import CameraControlsImpl from 'camera-controls'
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { PIECE_STATS, FILES, forward, type GameState, type Move, type Piece, type Pos } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
 import { useT } from '../i18n'
+import { Grass } from './Grass'
+import { PieceModel } from './pieceModel'
 import { sideTexture, topColor, topTexture } from './textures'
 
 export const HEIGHT_UNIT = 0.32
@@ -15,7 +16,7 @@ const PIECE_COLORS = { red: '#d9432f', blue: '#3a7cdc' }
 
 export type View = 'red' | 'blue' | 'top'
 
-const world = (x: number, y: number): [number, number] => [x - (SIZE - 1) / 2, (SIZE - 1) / 2 - y]
+export const world = (x: number, y: number): [number, number] => [x - (SIZE - 1) / 2, (SIZE - 1) / 2 - y]
 const topY = (h: Heights, p: Pos) => h[p.x][p.y] * HEIGHT_UNIT
 
 interface BoardProps {
@@ -193,6 +194,7 @@ function Terrain({ heights, showHeights, onSquare, onHoverSquare }: {
 
   return (
     <group>
+      <Grass heights={heights} />
       {squares.map(({ p, h, top, capSide, earth }) => {
         const [wx, wz] = world(p.x, p.y)
         const surface = h * HEIGHT_UNIT
@@ -246,71 +248,6 @@ function Pulse({ heights, p }: { heights: Heights; p: Pos }) {
       <planeGeometry args={[0.985, 0.985]} />
       <meshBasicMaterial ref={mat} color="#f5d547" transparent opacity={0.4} depthWrite={false} />
     </mesh>
-  )
-}
-
-// Piece silhouettes, readable at a glance like chess pieces: each says what
-// the Piece does, Strength shows as white pips (1, 2, 3), and the base keeps
-// the original design's rule that its number of sides is the Movement.
-//   Explorer  needle: tall and thin, fast and fragile (5-sided)
-//   Vanguard  wedge aimed at the enemy: the charge (square base)
-//   Sentinel  crenellated tower: slow, strongest, wins by Finishing first (3-sided)
-// Every model stands on y = 0 and faces Red's forward (-z); Blue's is turned round.
-const geoms = {
-  explorer: (() => {
-    const g = new THREE.CylinderGeometry(0.035, 0.2, 0.9, 5)
-    g.translate(0, 0.45, 0)
-    return g
-  })(),
-  vanguard: (() => {
-    // Side profile in (z, y): high at the back, low at the front.
-    const s = new THREE.Shape()
-    s.moveTo(-0.34, 0); s.lineTo(0.3, 0); s.lineTo(0.3, 0.7); s.lineTo(-0.34, 0.04); s.closePath()
-    const g = new THREE.ExtrudeGeometry(s, { depth: 0.56, bevelEnabled: false })
-    g.rotateY(-Math.PI / 2)
-    g.translate(0.28, 0, 0)
-    return g
-  })(),
-  sentinel: (() => {
-    const body = new THREE.CylinderGeometry(0.4, 0.44, 0.5, 3)
-    body.translate(0, 0.25, 0)
-    const parts = [0, 1, 2].map(i => {
-      const a = (i * 2 * Math.PI) / 3
-      const m = new THREE.BoxGeometry(0.17, 0.15, 0.17)
-      m.rotateY(a)
-      m.translate(Math.sin(a) * 0.27, 0.575, Math.cos(a) * 0.27)
-      return m
-    })
-    return mergeGeometries([body, ...parts])
-  })(),
-}
-const pipGeom = new THREE.SphereGeometry(0.068, 16, 12)
-const PIPS: Record<Piece['type'], [number, number, number][]> = {
-  explorer: [[0, 0.93, 0]],
-  // On the slope, nudged out along its normal so they sit proud of it.
-  vanguard: [[-0.14, 0.4, 0.03], [0.14, 0.4, 0.03]],
-  sentinel: [0, 1, 2].map(i => {
-    const a = (i * 2 * Math.PI) / 3 + Math.PI / 3
-    return [Math.sin(a) * 0.13, 0.5, Math.cos(a) * 0.13] as [number, number, number]
-  }),
-}
-
-function PieceModel({ type, side, selected = false, transparent = false }: {
-  type: Piece['type']; side: Piece['side']; selected?: boolean; transparent?: boolean
-}) {
-  const color = PIECE_COLORS[side]
-  return (
-    <group rotation-y={side === 'blue' ? Math.PI : 0}>
-      <mesh geometry={geoms[type]} castShadow>
-        <meshStandardMaterial color={color} roughness={0.38} metalness={0.15} transparent={transparent}
-          emissive={selected ? color : '#000'} emissiveIntensity={selected ? 0.35 : 0} />
-      </mesh>
-      {PIPS[type].map((p, i) => (
-        <mesh key={i} geometry={pipGeom} position={p}>
-          <meshStandardMaterial color="#ffffff" roughness={0.3} emissive="#ffffff" emissiveIntensity={0.25} transparent={transparent} />
-        </mesh>
-      ))}
-    </group>
   )
 }
 
