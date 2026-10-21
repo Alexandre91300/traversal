@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/game/rules.test.ts","./src/game/rules.ts","./src/game/terrain.ts","./src/ui/board3d.tsx","./src/ui/home.tsx","./src/ui/modals.tsx","./src/ui/playerbar.tsx","./src/ui/sidepanel.tsx","./src/ui/bits.tsx","./src/ui/usegame.ts"],"version":"5.6.3"}

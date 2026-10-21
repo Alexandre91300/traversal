@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* Layout: chess.com-style play screen — nav rail, board column flanked by
+   player bars, right-hand panel; on phones the board stays pinned and the
+   panel collapses into a compact strip + sheet. Single dark look by design. */
+@theme {
+  --color-bg: #2b2823;
+  --color-rail: #1f1d1a;
+  --color-surface: #23211d;
+  --color-surface-2: #34312b;
+  --color-line: #433f37;
+  --color-fg: #f2eee6;
+  --color-muted: #a59e92;
+  --color-accent: #81b64c;
+  --color-accent-hi: #95c95f;
+  --color-accent-shadow: #4f7a2b;
+  --color-red: #e2563f;
+  --color-blue: #4b8fe8;
+  --color-gold: #e8b83e;
+  --color-danger: #d9534f;
+
+  --font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
+  --font-body: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-logo: "UnifrakturMaguntia", "Old English Text MT", serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chunky, pressable buttons in the chess.com spirit. */
+.btn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  border-radius: 8px;
+  transition: transform 80ms ease, background-color 120ms ease, box-shadow 80ms ease;
+}
+.btn:active { transform: translateY(2px); }
+.btn:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-accent-hi);
+  outline-offset: 2px;
+}
+.btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: 0 4px 0 var(--color-accent-shadow);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.25);
+}
+.btn-primary:hover { background: var(--color-accent-hi); }
+.btn-primary:active { box-shadow: 0 2px 0 var(--color-accent-shadow); }
+.btn-quiet {
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.35);
+}
+.btn-quiet:hover { background: var(--color-line); }
+
+/* drei <Html> overlays must never swallow clicks meant for the 3D board. */
+.html3d, .html3d * {
+  pointer-events: none !important;
+}
+
+.badge3d {
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  transform: translateY(-14px);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.45);
+}
+
+.coord {
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
