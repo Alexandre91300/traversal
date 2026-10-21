@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Html, Line } from '@react-three/drei'
+import CameraControlsImpl from 'camera-controls'
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { PIECE_STATS, FILES, forward, type GameState, type Move, type Piece, type Pos } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
+import { useT } from '../i18n'
+import { Grass } from './Grass'
+import { PieceModel } from './pieceModel'
+import { sideTexture, topColor, topTexture } from './textures'
 
 export const HEIGHT_UNIT = 0.32
 const BASE_Y = -0.7
-const LIGHT = '#e6e3c6'
-const DARK = '#6f9a4e'
 const PIECE_COLORS = { red: '#d9432f', blue: '#3a7cdc' }
 
 export type View = 'red' | 'blue' | 'top'
 
-const world = (x: number, y: number): [number, number] => [x - (SIZE - 1) / 2, (SIZE - 1) / 2 - y]
+export const world = (x: number, y: number): [number, number] => [x - (SIZE - 1) / 2, (SIZE - 1) / 2 - y]
 const topY = (h: Heights, p: Pos) => h[p.x][p.y] * HEIGHT_UNIT
 
 interface BoardProps {
@@ -38,7 +40,8 @@ interface BoardProps {
 // Fills its nearest positioned ancestor, so flex parents need no definite height.
 export function Board3D(props: BoardProps) {
   return (
-    <div className="absolute inset-0">
+    // Right-drag turns the board, so no browser menu on the canvas.
+    <div className="absolute inset-0" onContextMenu={e => e.preventDefault()}>
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -74,6 +77,17 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
     }
   }, [view, viewNonce, maxH, center, aspect])
 
+  // Left click only ever plays; turning the board is a right-drag (touch: one finger).
+  useEffect(() => {
+    const c = controls.current
+    if (!c) return
+    const { ACTION } = CameraControlsImpl
+    c.mouseButtons.left = ACTION.NONE
+    c.mouseButtons.right = ACTION.ROTATE
+    c.mouseButtons.middle = ACTION.DOLLY
+    c.mouseButtons.wheel = ACTION.DOLLY
+  }, [])
+
   useFrame((_, dt) => {
     if (showcase && controls.current) controls.current.azimuthAngle += dt * 0.12
   })
@@ -95,10 +109,13 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
     <>
       <color attach="background" args={['#262420']} />
       <fog attach="fog" args={['#262420', 30, 60]} />
-      <hemisphereLight args={['#fff7e8', '#3a3328', 0.9]} />
+      <hemisphereLight args={['#fff4dc', '#3d4a2c', 0.85]} />
+      {/* Cool fill from the far side so shaded faces keep some shape. */}
+      <directionalLight position={[-8, 6, -6]} intensity={0.35} color="#cfe0ff" />
       <directionalLight
         position={[6, 14, 8]}
-        intensity={1.6}
+        intensity={1.8}
+        color="#fff1d6"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-9}
@@ -117,7 +134,7 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
         smoothTime={0.35}
       />
 
-      <Terrain heights={heights} maxH={maxH} showHeights={!!showHeights} onSquare={p => {
+      <Terrain heights={heights} showHeights={!!showHeights} onSquare={p => {
         const m = moveTo(p)
         if (m) onMove?.(m)
       }} onHoverSquare={p => onHover?.(p ? moveTo(p) ?? null : null)} />
@@ -153,63 +170,58 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
   )
 }
 
-function shade(hex: string, t: number) {
-  const c = new THREE.Color(hex)
-  c.offsetHSL(0, 0, -0.16 + 0.26 * t)
-  return c
-}
+// Each column is earth with a grass (or rock) cap a little wider than it,
+// so Squares read as turf blocks rather than flat-coloured boxes.
+const CAP = 0.07
 
-function Terrain({ heights, maxH, showHeights, onSquare, onHoverSquare }: {
-  heights: Heights; maxH: number; showHeights: boolean
+function Terrain({ heights, showHeights, onSquare, onHoverSquare }: {
+  heights: Heights; showHeights: boolean
   onSquare: (p: Pos) => void; onHoverSquare: (p: Pos | null) => void
 }) {
   const squares = useMemo(() => {
-    const out: { p: Pos; h: number; top: THREE.Material; side: THREE.Material }[] = []
+    const out: { p: Pos; h: number; top: THREE.Material; capSide: THREE.Material; earth: THREE.Material }[] = []
     for (let x = 0; x < SIZE; x++)
       for (let y = 0; y < SIZE; y++) {
         const h = heights[x][y]
-        const baseHex = (x + y) % 2 === 0 ? DARK : LIGHT
-        const col = shade(baseHex, h / maxH)
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = 128
-        const g = canvas.getContext('2d')!
-        g.fillStyle = `#${col.getHexString()}`
-        g.fillRect(0, 0, 128, 128)
-        if (showHeights) {
-          g.fillStyle = (x + y) % 2 === 0 ? 'rgba(255,255,255,0.7)' : 'rgba(40,52,30,0.6)'
-          g.font = '800 30px Montserrat, system-ui, sans-serif'
-          g.textAlign = 'right'
-          g.textBaseline = 'top'
-          g.fillText(String(h), 118, 8)
-        }
-        const tex = new THREE.CanvasTexture(canvas)
-        tex.colorSpace = THREE.SRGBColorSpace
-        tex.anisotropy = 4
-        const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 })
-        const side = new THREE.MeshStandardMaterial({ color: col.clone().multiplyScalar(0.62), roughness: 0.9 })
-        out.push({ p: { x, y }, h, top, side })
+        const body = h * HEIGHT_UNIT - BASE_Y - CAP
+        const top = new THREE.MeshStandardMaterial({ map: topTexture(x, y, h, showHeights), roughness: 0.95 })
+        const capSide = new THREE.MeshStandardMaterial({ color: new THREE.Color(...topColor(x, y, h).map(v => v / 255) as [number, number, number]).multiplyScalar(0.72).convertSRGBToLinear(), roughness: 0.95 })
+        const earth = new THREE.MeshStandardMaterial({ map: sideTexture(body), roughness: 1 })
+        out.push({ p: { x, y }, h, top, capSide, earth })
       }
     return out
-  }, [heights, maxH, showHeights])
+  }, [heights, showHeights])
 
   return (
     <group>
-      {squares.map(({ p, h, top, side }) => {
+      <Grass heights={heights} />
+      {squares.map(({ p, h, top, capSide, earth }) => {
         const [wx, wz] = world(p.x, p.y)
-        const height = h * HEIGHT_UNIT - BASE_Y
+        const surface = h * HEIGHT_UNIT
+        const body = surface - BASE_Y - CAP
         return (
-          <mesh key={`${p.x}-${p.y}`} position={[wx, BASE_Y + height / 2, wz]} castShadow receiveShadow
-            material={[side, side, top, side, side, side]}
+          <group key={`${p.x}-${p.y}`}
             onClick={e => { e.stopPropagation(); onSquare(p) }}
             onPointerOver={e => { e.stopPropagation(); onHoverSquare(p) }}
             onPointerOut={() => onHoverSquare(null)}>
-            <boxGeometry args={[0.985, height, 0.985]} />
-          </mesh>
+            <mesh position={[wx, BASE_Y + body / 2, wz]} castShadow receiveShadow material={earth}>
+              <boxGeometry args={[0.95, body, 0.95]} />
+            </mesh>
+            <mesh position={[wx, surface - CAP / 2, wz]} castShadow receiveShadow
+              material={[capSide, capSide, top, capSide, capSide, capSide]}>
+              <boxGeometry args={[0.99, CAP, 0.99]} />
+            </mesh>
+          </group>
         )
       })}
-      <mesh position={[0, BASE_Y - 0.15, 0]} receiveShadow>
-        <boxGeometry args={[SIZE + 0.6, 0.3, SIZE + 0.6]} />
-        <meshStandardMaterial color="#1b1a17" roughness={1} />
+      {/* Stone plinth with a lighter lip. */}
+      <mesh position={[0, BASE_Y - 0.16, 0]} receiveShadow>
+        <boxGeometry args={[SIZE + 0.7, 0.32, SIZE + 0.7]} />
+        <meshStandardMaterial color="#38332b" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, BASE_Y - 0.015, 0]} receiveShadow>
+        <boxGeometry args={[SIZE + 0.5, 0.03, SIZE + 0.5]} />
+        <meshStandardMaterial color="#4a443a" roughness={0.85} />
       </mesh>
     </group>
   )
@@ -236,71 +248,6 @@ function Pulse({ heights, p }: { heights: Heights; p: Pos }) {
       <planeGeometry args={[0.985, 0.985]} />
       <meshBasicMaterial ref={mat} color="#f5d547" transparent opacity={0.4} depthWrite={false} />
     </mesh>
-  )
-}
-
-// Piece silhouettes, readable at a glance like chess pieces: each says what
-// the Piece does, Strength shows as white pips (1, 2, 3), and the base keeps
-// the original design's rule that its number of sides is the Movement.
-//   Explorer  needle: tall and thin, fast and fragile (5-sided)
-//   Vanguard  wedge aimed at the enemy: the charge (square base)
-//   Sentinel  crenellated tower: slow, strongest, wins by Finishing first (3-sided)
-// Every model stands on y = 0 and faces Red's forward (-z); Blue's is turned round.
-const geoms = {
-  explorer: (() => {
-    const g = new THREE.CylinderGeometry(0.035, 0.2, 0.9, 5)
-    g.translate(0, 0.45, 0)
-    return g
-  })(),
-  vanguard: (() => {
-    // Side profile in (z, y): high at the back, low at the front.
-    const s = new THREE.Shape()
-    s.moveTo(-0.34, 0); s.lineTo(0.3, 0); s.lineTo(0.3, 0.7); s.lineTo(-0.34, 0.04); s.closePath()
-    const g = new THREE.ExtrudeGeometry(s, { depth: 0.56, bevelEnabled: false })
-    g.rotateY(-Math.PI / 2)
-    g.translate(0.28, 0, 0)
-    return g
-  })(),
-  sentinel: (() => {
-    const body = new THREE.CylinderGeometry(0.4, 0.44, 0.5, 3)
-    body.translate(0, 0.25, 0)
-    const parts = [0, 1, 2].map(i => {
-      const a = (i * 2 * Math.PI) / 3
-      const m = new THREE.BoxGeometry(0.17, 0.15, 0.17)
-      m.rotateY(a)
-      m.translate(Math.sin(a) * 0.27, 0.575, Math.cos(a) * 0.27)
-      return m
-    })
-    return mergeGeometries([body, ...parts])
-  })(),
-}
-const pipGeom = new THREE.SphereGeometry(0.068, 16, 12)
-const PIPS: Record<Piece['type'], [number, number, number][]> = {
-  explorer: [[0, 0.93, 0]],
-  // On the slope, nudged out along its normal so they sit proud of it.
-  vanguard: [[-0.14, 0.4, 0.03], [0.14, 0.4, 0.03]],
-  sentinel: [0, 1, 2].map(i => {
-    const a = (i * 2 * Math.PI) / 3 + Math.PI / 3
-    return [Math.sin(a) * 0.13, 0.5, Math.cos(a) * 0.13] as [number, number, number]
-  }),
-}
-
-function PieceModel({ type, side, selected = false, transparent = false }: {
-  type: Piece['type']; side: Piece['side']; selected?: boolean; transparent?: boolean
-}) {
-  const color = PIECE_COLORS[side]
-  return (
-    <group rotation-y={side === 'blue' ? Math.PI : 0}>
-      <mesh geometry={geoms[type]} castShadow>
-        <meshStandardMaterial color={color} roughness={0.38} metalness={0.15} transparent={transparent}
-          emissive={selected ? color : '#000'} emissiveIntensity={selected ? 0.35 : 0} />
-      </mesh>
-      {PIPS[type].map((p, i) => (
-        <mesh key={i} geometry={pipGeom} position={p}>
-          <meshStandardMaterial color="#ffffff" roughness={0.3} emissive="#ffffff" emissiveIntensity={0.25} transparent={transparent} />
-        </mesh>
-      ))}
-    </group>
   )
 }
 
@@ -340,6 +287,7 @@ function Target({ heights, move, piece, active, ghost, onMove, onHover }: {
   heights: Heights; move: Move; piece: Piece; active: boolean; ghost: boolean
   onMove?: (m: Move) => void; onHover?: (m: Move | null) => void
 }) {
+  const t = useT()
   const [wx, wz] = world(move.to.x, move.to.y)
   const y = topY(heights, move.to)
   const cap = move.capture
@@ -351,9 +299,9 @@ function Target({ heights, move, piece, active, ghost, onMove, onHover }: {
     onPointerOver: (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); document.body.style.cursor = 'pointer'; onHover?.(move) },
     onPointerOut: () => { document.body.style.cursor = ''; onHover?.(null) },
   }
-  const label = finish ? `Finish +${PIECE_STATS[piece.type].strength}`
+  const label = finish ? t('board.finish', { n: PIECE_STATS[piece.type].strength })
     : cap ? `${cap.allowed ? '⚔' : '✕'} ${cap.attack}–${cap.defense}`
-    : special ? (move.kind === 'leap' ? 'Leap' : 'Diagonal')
+    : special ? t(`kind.${move.kind as 'leap' | 'diagonal'}`)
     : String(move.cost)
   const badgeStyle = finish ? { background: '#81b64c', color: '#fff' }
     : cap ? { background: cap.allowed ? '#e2563f' : '#5a5650', color: '#fff' }
@@ -479,6 +427,7 @@ const EXIT_SECONDS = 1.2
 
 function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDone: () => void }) {
   const { piece, kind } = exit
+  const tr = useT()
   const group = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Mesh>(null)
   const ringMat = useRef<THREE.MeshBasicMaterial>(null)
@@ -528,7 +477,7 @@ function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDon
   })
 
   const ringAt: [number, number, number] = [wx, ground + 0.02, kind === 'capture' ? wz : wz + dir * 0.95]
-  const label = kind === 'finish' ? `+${PIECE_STATS[piece.type].strength}` : 'Captured'
+  const label = kind === 'finish' ? `+${PIECE_STATS[piece.type].strength}` : tr('board.captured')
   return (
     <>
       <group ref={group} position={[wx, y0, wz]}>

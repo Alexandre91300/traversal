@@ -1,8 +1,10 @@
 import { other, type GameState, type Side } from '../game/rules'
-import { Icon, PieceIcon, SIDE_HEX, SIDE_LABEL } from './bits'
+import { useT } from '../i18n'
+import { Icon, PieceIcon, SIDE_HEX } from './bits'
 
 // chess.com-style strip above/below the board: who, score, material taken.
 export function PlayerBar({ state, side, name, computer, thinking }: { state: GameState; side: Side; name: string; computer?: boolean; thinking?: boolean }) {
+  const t = useT()
   const toMove = !state.result && state.turn === side
   const won = state.result?.kind === 'win' && state.result.winner === side
   const taken = state.captured.filter(p => p.side === other(side))
@@ -22,31 +24,31 @@ export function PlayerBar({ state, side, name, computer, thinking }: { state: Ga
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span className="font-display font-bold truncate">{name}</span>
-          <span className="text-muted text-xs">{SIDE_LABEL[side]}</span>
+          <span className="text-muted text-xs">{t(`side.${side}`)}</span>
           {toMove && (thinking
-            ? <span className="text-accent-hi text-xs font-display font-bold thinking">thinking</span>
-            : <span className="text-accent-hi text-xs font-display font-bold">to move</span>)}
-          {won && <span className="text-gold text-xs font-display font-bold">winner</span>}
+            ? <span className="text-accent-hi text-xs font-display font-bold thinking">{t('bar.thinking')}</span>
+            : <span className="text-accent-hi text-xs font-display font-bold">{t('bar.toMove')}</span>)}
+          {won && <span className="text-gold text-xs font-display font-bold">{t('bar.winner')}</span>}
         </div>
         <div className="flex items-center gap-2 h-5 text-xs text-muted">
           {finished.length > 0 && (
-            <span className="flex items-center gap-0.5" title="Finished">
+            <span className="flex items-center gap-0.5" title={t('bar.finished')}>
               {finished.map(p => <PieceIcon key={p.id} type={p.type} side={p.side} size={13} />)}
               <span className="ml-0.5">↑</span>
             </span>
           )}
           {taken.length > 0 && (
-            <span className="flex items-center gap-0.5" title="Captured">
+            <span className="flex items-center gap-0.5" title={t('bar.captured')}>
               {taken.map(p => <PieceIcon key={p.id} type={p.type} side={p.side} size={13} />)}
             </span>
           )}
-          {finished.length === 0 && taken.length === 0 && <span>{remaining} pieces on board</span>}
+          {finished.length === 0 && taken.length === 0 && <span>{t('bar.onBoard', { n: remaining })}</span>}
         </div>
       </div>
-      <div className="text-right shrink-0" title="Score: Strength of Finished pieces">
+      <div className="text-right shrink-0" title={t('bar.scoreTitle')}>
         {/* Keyed on the score so it pops each time it changes. */}
         <div key={state.score[side]} className={`font-display font-extrabold text-2xl leading-none num ${state.score[side] ? 'score-pop' : ''}`}>{state.score[side]}</div>
-        <div className="text-[10px] uppercase tracking-wider text-muted">pts</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted">{t('bar.pts')}</div>
       </div>
     </div>
   )

@@ -11,10 +11,10 @@ export type Level = 'easy' | 'normal' | 'hard'
 // Depth is plies searched; root moves scoring within `margin` of the best
 // count as equally good and one is picked at random, so games vary and Easy
 // makes human-looking slips.
-export const LEVELS: Record<Level, { depth: number; margin: number; name: string; blurb: string }> = {
-  easy: { depth: 1, margin: 60, name: 'Easy', blurb: 'Grabs what it sees' },
-  normal: { depth: 2, margin: 6, name: 'Normal', blurb: 'Sees your reply' },
-  hard: { depth: 3, margin: 2, name: 'Hard', blurb: 'Plans a move ahead' },
+export const LEVELS: Record<Level, { depth: number; margin: number }> = {
+  easy: { depth: 1, margin: 60 },
+  normal: { depth: 2, margin: 6 },
+  hard: { depth: 3, margin: 2 },
 }
 
 export function legalMoves(s: GameState): Move[] {

@@ -4,6 +4,7 @@ import AiWorker from '../game/ai.worker?worker&inline'
 import { encodeMove, replay, type MoveRef } from '../game/replay'
 import { isLegal, movesFor, newGame, other, type GameState, type Move, type Side } from '../game/rules'
 import { generateTerrain, type TerrainModeId } from '../game/terrain'
+import { useT } from '../i18n'
 
 export interface GameSetup {
   mode: TerrainModeId
@@ -24,6 +25,7 @@ export const HUMAN: Side = 'red'
 const MIN_THINK_MS = 650
 
 export function useGame(initial: GameSetup) {
+  const t = useT()
   const [setup, setSetup] = useState(initial)
   // A game is its starting position plus the Moves played, as refs (see replay.ts).
   const start = useMemo(() => newGame(generateTerrain(setup.mode, setup.seed)), [setup])
@@ -102,25 +104,24 @@ export function useGame(initial: GameSetup) {
 
   const play = useCallback((m: Move) => {
     if (!canPlay) {
-      const turn = state.turn === 'red' ? 'Red' : 'Blue'
       setNotice(
-        reviewing ? 'You are reviewing an earlier position. Press → or End to go back to the game.'
-        : state.result ? 'The game is over.'
-        : thinking ? 'Just looking: the computer is thinking.'
-        : waiting ? "Just looking: it's your opponent's move."
-        : `Just looking: it's ${turn}'s turn.`,
+        reviewing ? t('notice.reviewing')
+        : state.result ? t('notice.over')
+        : thinking ? t('notice.thinking')
+        : waiting ? t('notice.waiting')
+        : t('notice.turn', { side: t(`side.${state.turn}`) }),
       )
       return
     }
     if (!isLegal(m)) {
       const c = m.capture!
-      setNotice(`Attack not possible: ${c.attack} attack is lower than ${c.defense} defense.`)
+      setNotice(t('notice.attack', { a: c.attack, d: c.defense }))
       return
     }
     setLog(l => [...l, encodeMove(start, m)])
     setNotice(null)
     clearTransient()
-  }, [start, canPlay, reviewing, state, thinking, waiting])
+  }, [start, canPlay, reviewing, state, thinking, waiting, t])
 
   // Step through the game like chess.com: -1/+1 a Move, or jump to a ply.
   const goTo = useCallback((i: number | null) => {

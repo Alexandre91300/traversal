@@ -1,32 +1,41 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { LEVELS, type Level } from '../game/ai'
+import type { Level } from '../game/ai'
 import type { PieceType, Side } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
+import { useT } from '../i18n'
 
-export const SIDE_LABEL: Record<Side, string> = { red: 'Red', blue: 'Blue' }
-export const SIDE_PLAYER: Record<Side, string> = { red: 'Player 1', blue: 'Player 2' }
 export const SIDE_HEX: Record<Side, string> = { red: '#e2563f', blue: '#4b8fe8' }
 
 // Against the computer the human is always Red (see HUMAN in useGame).
-export const playerNames = (computer?: Level): Record<Side, string> =>
-  computer ? { red: 'You', blue: `Computer · ${LEVELS[computer].name}` } : SIDE_PLAYER
-
-// Side views of the 3D models: needle, wedge, tower, with Strength pips.
-const SILHOUETTES: Record<PieceType, { body: string; pips: [number, number][] }> = {
-  explorer: { body: 'M7.6 19.5h4.8L10.7 6h-1.4z', pips: [[10, 4.4]] },
-  vanguard: { body: 'M2.5 19.5h15v-3.6L2.5 5.5z', pips: [[6.5, 10.6], [11.5, 13.4]] },
-  sentinel: {
-    body: 'M3 19.5h14l-1-11V4h-3v2.5h-1.6V4H8.6v2.5H7V4H4v4.5z',
-    pips: [[7, 12], [10, 12], [13, 12]],
-  },
+export function usePlayerNames(computer?: Level): Record<Side, string> {
+  const t = useT()
+  return computer
+    ? { red: t('you'), blue: t('computer.named', { level: t(`level.${computer}`) }) }
+    : { red: t('player.1'), blue: t('player.2') }
 }
 
+// Side views of the 3D models (pieceModel.tsx): one turned base, stem and
+// collar, told apart by the head (spire, spearhead, rook), with Strength as
+// bronze bands round the stem.
+const BASE = 'M5 19.5H15L13 17.3H11.8L11.4 11H13V10'
+const BASE_BACK = 'H7V11H8.6L8.2 17.3H7Z'
+const HEADS: Record<PieceType, string> = {
+  explorer: 'H12L10 2L8 10',
+  vanguard: 'H10.7V8.6L13.5 6.8L10 1.8L6.5 6.8L9.3 8.6V10',
+  sentinel: 'H12.5L14 6.8V3H12.2V4.5H10.9V3H9.1V4.5H7.8V3H6V6.8L7.5 10',
+}
+const BANDS: Record<PieceType, number[]> = { explorer: [14.2], vanguard: [13.4, 15], sentinel: [12.6, 14.2, 15.8] }
+// Half-width of the stem at height y, so each band sits just proud of it.
+const stemHalf = (y: number) => 1.4 + ((y - 11) * 0.4) / 6.3
+
 export function PieceIcon({ type, side, size = 18 }: { type: PieceType; side: Side; size?: number }) {
-  const { body, pips } = SILHOUETTES[type]
   return (
     <svg width={size} height={size} viewBox="0 0 20 21" aria-hidden="true" className="shrink-0">
-      <path d={body} fill={SIDE_HEX[side]} stroke="rgb(0 0 0 / 0.45)" strokeWidth="1.1" strokeLinejoin="round" />
-      {pips.map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r={type === 'explorer' ? 2 : 1.35} fill="#fff" stroke="rgb(0 0 0 / 0.3)" strokeWidth="0.5" />)}
+      <path d={BASE + HEADS[type] + BASE_BACK} fill={SIDE_HEX[side]} stroke="rgb(0 0 0 / 0.45)" strokeWidth="1.1" strokeLinejoin="round" />
+      {BANDS[type].map(y => {
+        const w = stemHalf(y) + 0.5
+        return <rect key={y} x={10 - w} y={y - 0.45} width={w * 2} height={0.9} rx={0.4} fill="#c8904e" />
+      })}
     </svg>
   )
 }
@@ -93,9 +102,10 @@ export function Logo({ className = '' }: { className?: string }) {
 }
 
 export function ConceptBadge() {
+  const t = useT()
   return (
     <span className="inline-block text-[10px] uppercase tracking-[0.12em] font-display font-bold text-muted border border-line rounded px-1.5 py-0.5">
-      Unofficial UI concept
+      {t('concept')}
     </span>
   )
 }
