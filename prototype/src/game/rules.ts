@@ -186,6 +186,8 @@ export function movesFor(s: GameState, piece: Piece): Move[] {
       for (const [dx, dy] of dirs) {
         const to = { x: piece.x + dx * dist, y: piece.y + dy * dist }
         if (!inBounds(to)) continue
+        // A leap ignores Height, not Pieces: it can't pass over one.
+        if (dist === 2 && pieceAt(s, { x: piece.x + dx, y: piece.y + dy })) continue
         const occ = pieceAt(s, to)
         if (occ && occ.side === piece.side) continue
         out.push({ pieceId: piece.id, kind, to, path: [to], cost: movement, capture: occ ? combat(s, piece, occ, null) : undefined })

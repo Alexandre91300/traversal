@@ -34,7 +34,7 @@ _Avoid_: Unit, pawn, soldier
 Explorer, Vanguard or Sentinel; each has a Movement and a Strength that sum to 6.
 
 **Explorer**:
-Pentagon-cone Piece Type with Movement 5 and Strength 1, which may instead step 1 diagonally or leap 2 orthogonally, ignoring Height.
+Pentagon-cone Piece Type with Movement 5 and Strength 1, which may instead step 1 diagonally or leap 2 orthogonally, ignoring Height (but never over another Piece).
 _Avoid_: Medic
 
 **Vanguard**:
