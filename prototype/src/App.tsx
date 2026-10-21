@@ -3,12 +3,15 @@ import { Board3D, type View } from './ui/Board3D'
 import { ConceptBadge, Icon, Logo, playerNames } from './ui/bits'
 import { Home } from './ui/Home'
 import { GameOverModal, NewGameModal, RulesModal, randomSeed } from './ui/Modals'
+import { useOnlineSync } from './ui/online'
+import { OnlineModal } from './ui/OnlineModal'
 import { PlayerBar } from './ui/PlayerBar'
 import { SidePanel } from './ui/SidePanel'
 import { Tutorial } from './ui/Tutorial'
+import { other } from './game/rules'
 import { HUMAN, useGame, type GameSetup, type Settings } from './ui/useGame'
 
-type Overlay = 'new' | 'rules' | null
+type Overlay = 'new' | 'rules' | 'online' | null
 
 export default function App() {
   const [screen, setScreen] = useState<'home' | 'play' | 'learn'>('home')
@@ -30,29 +33,37 @@ export default function App() {
   return (
     <>
       {screen === 'home'
-        ? <Home onLearn={learn} onComputer={() => quick('normal')} onQuickPlay={() => quick()} onPlay={() => setOverlay('new')} />
+        ? <Home onLearn={learn} onComputer={() => quick('normal')} onQuickPlay={() => quick()} onPlay={() => setOverlay('new')} onOnline={() => setOverlay('online')} />
         : screen === 'learn'
           ? <Tutorial onExit={() => setScreen('home')} onPlay={quick} />
-          : <PlayScreen game={game} onHome={() => setScreen('home')} onNewGame={() => setOverlay('new')} onRules={() => setOverlay('rules')} onLearn={learn} onStart={start} />}
+          : <PlayScreen game={game} onHome={() => setScreen('home')} onNewGame={() => setOverlay('new')} onRules={() => setOverlay('rules')} onLearn={learn} onOnline={() => setOverlay('online')} onStart={start} />}
       {overlay === 'new' && <NewGameModal current={game.setup} onStart={start} onClose={() => setOverlay(null)} />}
       {overlay === 'rules' && <RulesModal onClose={() => setOverlay(null)} onLearn={learn} />}
+      {overlay === 'online' && <OnlineModal onStart={start} onClose={() => setOverlay(null)} />}
     </>
   )
 }
 
-function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onStart }: {
-  game: ReturnType<typeof useGame>; onHome: () => void; onNewGame: () => void; onRules: () => void; onLearn: () => void; onStart: (s: GameSetup) => void
+function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onOnline, onStart }: {
+  game: ReturnType<typeof useGame>; onHome: () => void; onNewGame: () => void; onRules: () => void; onLearn: () => void
+  onOnline: () => void; onStart: (s: GameSetup) => void
 }) {
-  const { state } = game
-  const { computer } = game.setup
-  const names = playerNames(computer)
+  const { state, mySide } = game
+  const { computer, online } = game.setup
+  const net = useOnlineSync(game)
+  const names = online
+    ? { [online.side]: 'You', [other(online.side)]: net?.opponentName || 'Opponent' } as ReturnType<typeof playerNames>
+    : playerNames(computer)
   const [settings, setSettings] = useState<Settings>(() => ({ showHeights: true, showCoords: window.innerWidth >= 1024, autoFlip: false }))
-  const [view, setView] = useState<View>('red')
+  const [view, setView] = useState<View>(mySide ?? 'red')
   const [reviewing, setReviewing] = useState(false)
 
+  // Each new game starts from the side this device plays.
+  useEffect(() => setView(mySide ?? 'red'), [game.setup]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
-    // Against the computer the board stays on the human's side.
-    if (settings.autoFlip && view !== 'top' && !computer) setView(state.turn)
+    // When this device plays one side, the board stays on that side.
+    if (settings.autoFlip && view !== 'top' && !mySide) setView(state.turn)
   }, [state.turn, settings.autoFlip]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (!state.result) setReviewing(false) }, [state.result])
@@ -78,6 +89,7 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onStart }: {
         <button onClick={onHome} className="mb-4 px-2" aria-label="Home"><Logo className="text-[21px]" /></button>
         <RailButton icon="plus" label="New game" onClick={onNewGame} />
         <RailButton icon="book" label="Rules" onClick={onRules} />
+        <RailButton icon="globe" label="Online" onClick={onOnline} />
         <RailButton icon="learn" label="Learn" onClick={onLearn} />
         <RailButton icon="home" label="Home" onClick={onHome} />
         <div className="mt-auto px-2 text-center"><ConceptBadge /></div>
@@ -88,6 +100,7 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onStart }: {
           <button onClick={onHome} aria-label="Home"><Logo className="text-2xl" /></button>
           <ConceptBadge />
           <div className="ml-auto flex gap-1">
+            <IconButton icon="globe" label="Play online" onClick={onOnline} />
             <IconButton icon="book" label="Rules" onClick={onRules} />
             <IconButton icon="plus" label="New game" onClick={onNewGame} />
           </div>
@@ -114,6 +127,18 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onStart }: {
                 {game.notice}
               </div>
             )}
+            {net && !state.result && (net.lockedOut || !net.opponentHere) && (
+              <div role="status" className="absolute top-2 left-1/2 -translate-x-1/2 w-[min(92%,420px)] rounded-lg bg-surface/95 border border-line shadow-xl px-4 py-3 text-sm">
+                {net.lockedOut ? (
+                  <><b>This game already has two players.</b> <span className="text-muted">Create your own from Play online.</span></>
+                ) : (
+                  <><b className="thinking">Waiting for your opponent</b>
+                    <span className="block text-muted text-xs mt-0.5">
+                      {game.log.length ? 'They left the page. The game resumes when they come back.' : 'Share this page with them; your game appears under Play online.'}
+                    </span></>
+                )}
+              </div>
+            )}
             {state.result && reviewing && (
               <button className="btn btn-primary absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2" onClick={() => setReviewing(false)}>
                 Show result
@@ -129,14 +154,15 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onStart }: {
       </main>
 
       {state.result && !reviewing && (
-        <GameOverModal state={state} computer={computer} onClose={() => setReviewing(true)} onNewGame={onNewGame}
-          onRematch={() => onStart({ ...game.setup })} />
+        <GameOverModal state={state} names={names} mySide={mySide} onClose={() => setReviewing(true)}
+          onNewGame={online ? onOnline : onNewGame}
+          onRematch={online ? undefined : () => onStart({ ...game.setup })} />
       )}
     </div>
   )
 }
 
-function RailButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'home' | 'learn'; label: string; onClick: () => void }) {
+function RailButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'home' | 'learn' | 'globe'; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="w-[88px] flex flex-col items-center gap-1 py-2.5 rounded-lg text-muted hover:text-fg hover:bg-surface-2 font-display font-bold text-xs">
       <Icon name={icon} size={22} />{label}
@@ -144,7 +170,7 @@ function RailButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'home' |
   )
 }
 
-function IconButton({ icon, label, onClick }: { icon: 'plus' | 'book'; label: string; onClick: () => void }) {
+function IconButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'globe'; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} aria-label={label} className="p-2 rounded-md text-muted hover:text-fg hover:bg-surface-2">
       <Icon name={icon} size={20} />

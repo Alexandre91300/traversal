@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { LEVELS, type Level } from '../game/ai'
-import { PIECE_STATS, type GameResult, type GameState, type PieceType } from '../game/rules'
+import { PIECE_STATS, type GameResult, type GameState, type PieceType, type Side } from '../game/rules'
 import { TERRAIN_MODES, generateTerrain, type TerrainModeId } from '../game/terrain'
-import { Icon, Modal, PieceIcon, SIDE_HEX, playerNames, TerrainPreview } from './bits'
-import { HUMAN, type GameSetup } from './useGame'
+import { Icon, Modal, PieceIcon, SIDE_HEX, TerrainPreview } from './bits'
+import type { GameSetup } from './useGame'
 
 export const randomSeed = () => Math.floor(Math.random() * 2 ** 31)
 
@@ -74,15 +74,16 @@ const REASON: Record<GameResult['reason'], string> = {
   resign: 'The other player resigned.',
 }
 
-export function GameOverModal({ state, computer, onRematch, onNewGame, onClose }: {
-  state: GameState; computer?: Level; onRematch: () => void; onNewGame: () => void; onClose: () => void
+// `mySide`: the side this device plays, against the computer or online.
+export function GameOverModal({ state, names, mySide, onRematch, onNewGame, onClose }: {
+  state: GameState; names: Record<Side, string>; mySide: Side | null
+  onRematch?: () => void; onNewGame: () => void; onClose: () => void
 }) {
   const r = state.result!
-  const names = playerNames(computer)
   const title = r.kind === 'draw' ? 'Draw'
-    : computer ? (r.winner === HUMAN ? 'You win!' : 'The computer wins')
+    : r.winner === mySide ? 'You win!'
     : `${names[r.winner]} wins`
-  const reason = computer && r.reason === 'resign' && r.winner !== HUMAN ? 'You resigned.' : REASON[r.reason]
+  const reason = mySide && r.reason === 'resign' ? (r.winner === mySide ? 'Your opponent resigned.' : 'You resigned.') : REASON[r.reason]
   return (
     <Modal label="Game over" onClose={onClose}>
       <div className="p-6 text-center">
@@ -101,7 +102,7 @@ export function GameOverModal({ state, computer, onRematch, onNewGame, onClose }
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <button className="btn btn-quiet flex-1 py-3" onClick={onClose}>Review board</button>
-          <button className="btn btn-quiet flex-1 py-3" onClick={onRematch}>Rematch</button>
+          {onRematch && <button className="btn btn-quiet flex-1 py-3" onClick={onRematch}>Rematch</button>}
           <button className="btn btn-primary flex-1 py-3" onClick={onNewGame}>New game</button>
         </div>
       </div>

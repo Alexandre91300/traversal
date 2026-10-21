@@ -38,7 +38,7 @@ export function SidePanel({ game, view, setView, settings, setSettings, onNewGam
             {preview?.capture ? <CombatCard combat={preview.capture} attacker={selected!} state={state} />
               : preview ? <MoveCard move={preview} piece={selected!} />
               : selected ? <PieceCard piece={selected} />
-              : state.result ? null : <Hints />}
+              : state.result ? null : <Hints waiting={game.waiting} />}
             <Legend />
           </>
         ) : <MoveList state={state} />}
@@ -234,10 +234,10 @@ function Breakdown({ title, total, rows, sign, icon }: { title: string; total: n
   )
 }
 
-function Hints() {
+function Hints({ waiting }: { waiting: boolean }) {
   return (
     <Card>
-      <div className="font-display font-bold">Your turn</div>
+      <div className="font-display font-bold">{waiting ? "Your opponent's turn" : 'Your turn'}</div>
       <ul className="text-sm text-muted space-y-1.5 list-disc pl-4">
         <li>Select one of your pieces to see where it can go.</li>
         <li>Each step costs 1, or Height difference + 1 when climbing or descending.</li>

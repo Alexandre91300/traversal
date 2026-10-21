@@ -83,6 +83,10 @@ The game ends when two Pieces in total (either side) have Finished, or at the mo
 The prototype's built-in Blue player, at three Levels (Easy, Normal, Hard); the human always plays Red and moves first.
 _Avoid_: Bot, AI player
 
+**Online game**:
+A game between two people on different devices, both viewing the published prototype; the creator plays Red, the joiner Blue.
+_Avoid_: Multiplayer match, remote game
+
 **Lesson**:
 One step of the Tutorial: a small scripted position where the player learns a single rule by making the move; Blue never replies.
 
