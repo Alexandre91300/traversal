@@ -34,7 +34,7 @@ _Avoid_: Unit, pawn, soldier
 Explorer, Vanguard or Sentinel; each has a Movement and a Strength that sum to 6.
 
 **Explorer**:
-Pentagon-cone Piece Type with Movement 5 and Strength 1, which may instead step 1 diagonally or leap 2 orthogonally, ignoring Height.
+Pentagon-cone Piece Type with Movement 5 and Strength 1, which may instead step 1 diagonally or leap 2 orthogonally, ignoring Height (but never over another Piece).
 _Avoid_: Medic
 
 **Vanguard**:
@@ -82,6 +82,10 @@ The game ends when two Pieces in total (either side) have Finished, or at the mo
 **Computer opponent**:
 The prototype's built-in Blue player, at three Levels (Easy, Normal, Hard); the human always plays Red and moves first.
 _Avoid_: Bot, AI player
+
+**Online game**:
+A game between two people on different devices, both viewing the published prototype; the creator plays Red, the joiner Blue.
+_Avoid_: Multiplayer match, remote game
 
 **Lesson**:
 One step of the Tutorial: a small scripted position where the player learns a single rule by making the move; Blue never replies.

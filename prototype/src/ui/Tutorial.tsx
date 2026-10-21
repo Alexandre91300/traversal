@@ -33,12 +33,11 @@ export function Tutorial({ onExit, onPlay }: { onExit: () => void; onPlay: (comp
     setHovered(null)
     setNotice(null)
     if (!id || done) return setSelectedId(null)
-    const p = state.pieces.find(q => q.id === id)
-    if (p?.side !== 'red') return setNotice('That is a Blue piece. You play Red in the tutorial.')
     setSelectedId(prev => (prev === id ? null : id))
   }
 
   const play = (m: Move) => {
+    if (selected?.side !== 'red') return setNotice('Just looking: you play Red in the tutorial.')
     if (!isLegal(m)) {
       const c = m.capture!
       return setNotice(`Attack not possible: ${c.attack} attack is lower than ${c.defense} defense.`)
@@ -86,6 +85,7 @@ export function Tutorial({ onExit, onPlay }: { onExit: () => void; onPlay: (comp
             viewNonce={index}
             showHeights={lesson.heights.some(col => col.some(Boolean))}
             highlight={done ? [] : lesson.highlight}
+            ghost={selected?.side !== 'red'}
             onPieceClick={p => select(p.id)}
             onMove={play}
             onHover={setHovered}

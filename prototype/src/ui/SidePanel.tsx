@@ -20,7 +20,8 @@ interface Props {
 }
 
 export function SidePanel({ game, view, setView, settings, setSettings, onNewGame }: Props) {
-  const { state, selected, hovered, notice } = game
+  // The panel describes the position on screen, which may be an earlier one.
+  const { shown: state, selected, hovered, notice } = game
   const [tab, setTab] = useState<'play' | 'moves'>('play')
   const preview = hovered && selected ? hovered : null
 
@@ -28,7 +29,7 @@ export function SidePanel({ game, view, setView, settings, setSettings, onNewGam
     <div className="flex flex-col h-full min-h-0 bg-surface lg:rounded-xl lg:border border-line">
       <div className="flex border-b border-line" role="tablist">
         <TabButton active={tab === 'play'} onClick={() => setTab('play')} icon="play">Play</TabButton>
-        <TabButton active={tab === 'moves'} onClick={() => setTab('moves')} icon="list">Moves <span className="text-muted num">{state.moves.length}</span></TabButton>
+        <TabButton active={tab === 'moves'} onClick={() => setTab('moves')} icon="list">Moves <span className="text-muted num">{game.plies}</span></TabButton>
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
@@ -37,18 +38,20 @@ export function SidePanel({ game, view, setView, settings, setSettings, onNewGam
             <Status state={state} notice={notice} />
             {preview?.capture ? <CombatCard combat={preview.capture} attacker={selected!} state={state} />
               : preview ? <MoveCard move={preview} piece={selected!} />
-              : selected ? <PieceCard piece={selected} />
-              : state.result ? null : <Hints />}
+              : selected ? <PieceCard piece={selected} looking={!game.canPlay} />
+              : state.result ? null : <Hints waiting={game.waiting} />}
             <Legend />
           </>
-        ) : <MoveList state={state} />}
+        ) : <MoveList state={game.state} ply={game.ply} onPick={game.goTo} />}
       </div>
+
+      <ReviewBar game={game} />
 
       <div className="border-t border-line p-2 grid grid-cols-5 gap-1.5">
         <ToolButton icon="undo" label="Undo" onClick={game.undo} disabled={!game.canUndo} />
         <ToolButton icon="flip" label="Flip" onClick={() => setView(view === 'blue' ? 'red' : 'blue')} />
         <ToolButton icon="top" label={view === 'top' ? '3D' : 'Top'} onClick={() => setView(view === 'top' ? state.turn : 'top')} active={view === 'top'} />
-        <ToolButton icon="flag" label="Resign" onClick={game.resign} disabled={!!state.result} />
+        <ToolButton icon="flag" label="Resign" onClick={game.resign} disabled={!!game.state.result} />
         <SettingsButton settings={settings} setSettings={setSettings} />
       </div>
       <div className="p-2 pt-0">
@@ -133,7 +136,7 @@ export function Card({ children }: { children: ReactNode }) {
   return <div className="rounded-lg bg-surface-2/70 border border-line p-3 space-y-2">{children}</div>
 }
 
-function PieceCard({ piece }: { piece: Piece }) {
+function PieceCard({ piece, looking }: { piece: Piece; looking: boolean }) {
   const s = PIECE_STATS[piece.type]
   return (
     <Card>
@@ -149,7 +152,9 @@ function PieceCard({ piece }: { piece: Piece }) {
         <Stat label="Strength" value={s.strength} />
       </div>
       <p className="text-sm text-muted">{ABILITY[piece.type]}</p>
-      <p className="text-xs text-muted">Hover a marker to preview the path, cost or fight.</p>
+      <p className="text-xs text-muted">
+        {looking ? 'Just looking: these are the moves it would have. ' : ''}Hover a marker to preview the path, cost or fight.
+      </p>
     </Card>
   )
 }
@@ -234,10 +239,10 @@ function Breakdown({ title, total, rows, sign, icon }: { title: string; total: n
   )
 }
 
-function Hints() {
+function Hints({ waiting }: { waiting: boolean }) {
   return (
     <Card>
-      <div className="font-display font-bold">Your turn</div>
+      <div className="font-display font-bold">{waiting ? "Your opponent's turn" : 'Your turn'}</div>
       <ul className="text-sm text-muted space-y-1.5 list-disc pl-4">
         <li>Select one of your pieces to see where it can go.</li>
         <li>Each step costs 1, or Height difference + 1 when climbing or descending.</li>
@@ -263,29 +268,64 @@ function Legend() {
   )
 }
 
-function MoveList({ state }: { state: GameState }) {
-  const end = useRef<HTMLDivElement>(null)
-  useEffect(() => end.current?.scrollIntoView({ block: 'nearest' }), [state.moves.length])
+// Every Move is a button: click one to see the position right after it.
+function MoveList({ state, ply, onPick }: { state: GameState; ply: number; onPick: (i: number) => void }) {
+  const current = useRef<HTMLButtonElement>(null)
+  useEffect(() => current.current?.scrollIntoView({ block: 'nearest' }), [ply])
   if (!state.moves.length) return <p className="text-sm text-muted p-2">No moves yet. Red plays first.</p>
-  const rows: { n: number; red?: string; blue?: string }[] = []
+  const rows: { n: number; red?: [string, number]; blue?: [string, number] }[] = []
   state.moves.forEach((m, i) => {
     const n = Math.floor(i / 2)
     rows[n] ??= { n: n + 1 }
-    rows[n][m.side] = m.notation
+    rows[n][m.side] = [m.notation, i + 1]
   })
+  const cell = (c?: [string, number]) => c && (
+    <button ref={c[1] === ply ? current : undefined} onClick={() => onPick(c[1])}
+      className={`text-left font-bold rounded px-1.5 -mx-1.5 ${c[1] === ply ? 'bg-accent text-white' : 'hover:bg-line'}`}>
+      {c[0]}
+    </button>
+  )
   return (
     <div className="text-sm">
       <ol className="font-display">
         {rows.map((r, i) => (
           <li key={r.n} className={`grid grid-cols-[2.5rem_1fr_1fr] px-2 py-1 rounded ${i % 2 ? '' : 'bg-surface-2/50'}`}>
             <span className="text-muted num">{r.n}.</span>
-            <span className="font-bold">{r.red}</span>
-            <span className="font-bold">{r.blue}</span>
+            <span>{cell(r.red)}</span>
+            <span>{cell(r.blue)}</span>
           </li>
         ))}
       </ol>
-      <div ref={end} />
       <p className="text-xs text-muted mt-3 px-2">E/V/S = Explorer/Vanguard/Sentinel · x = capture · ↑ = Finish</p>
+    </div>
+  )
+}
+
+// chess.com-style stepping through the game, live or after it ends.
+function ReviewBar({ game }: { game: Game }) {
+  const { ply, plies, reviewing } = game
+  const btn = (icon: 'first' | 'prev' | 'next' | 'last', label: string, to: number, disabled: boolean) => (
+    <button onClick={() => game.goTo(to)} disabled={disabled} aria-label={label} title={label}
+      className="btn btn-quiet flex-1 grid place-items-center py-1.5 disabled:opacity-35 disabled:pointer-events-none">
+      <Icon name={icon} size={16} />
+    </button>
+  )
+  return (
+    <div className="border-t border-line px-2 pt-2 space-y-1.5">
+      <div className="flex items-center justify-between text-xs px-1">
+        <span className={reviewing ? 'text-gold font-display font-bold' : 'text-muted'}>
+          {reviewing ? (ply ? `Reviewing move ${ply} of ${plies}` : 'Reviewing the start') : plies ? `Move ${plies}` : 'Start'}
+        </span>
+        {reviewing
+          ? <button className="text-accent-hi font-display font-bold hover:underline" onClick={() => game.goTo(null)}>Back to live →</button>
+          : <span className="text-muted">← → to review</span>}
+      </div>
+      <div className="flex gap-1.5">
+        {btn('first', 'First position (↑)', 0, ply === 0)}
+        {btn('prev', 'Previous move (←)', ply - 1, ply === 0)}
+        {btn('next', 'Next move (→)', ply + 1, ply === plies)}
+        {btn('last', 'Latest position (↓)', plies, ply === plies)}
+      </div>
     </div>
   )
 }

@@ -10,7 +10,9 @@ export function PlayerBar({ state, side, name, computer, thinking }: { state: Ga
   const remaining = state.pieces.filter(p => p.side === side).length
 
   return (
-    <div className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${toMove ? 'bg-surface-2' : 'bg-transparent'}`}>
+    // The side to move gets a coloured edge, so the turn reads from the bars too.
+    <div className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${toMove ? 'bg-surface-2' : 'bg-transparent opacity-80'}`}
+      style={toMove ? { boxShadow: `inset 4px 0 0 ${SIDE_HEX[side]}, 0 0 0 1px ${SIDE_HEX[side]}55` } : undefined}>
       <div className="relative grid place-items-center w-9 h-9 rounded-md shrink-0" style={{ background: SIDE_HEX[side] }}>
         {computer
           ? <span className="text-white"><Icon name="cpu" size={20} /></span>

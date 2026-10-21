@@ -29,6 +29,16 @@ describe('movement', () => {
     const s = state([piece('red', 'sentinel', 0, 0), piece('red', 'sentinel', 0, 1), piece('red', 'sentinel', 1, 0)])
     expect(movesFor(s, s.pieces[0]).filter(m => m.kind === 'step')).toHaveLength(0)
   })
+
+  it('cannot leap over a piece of either side', () => {
+    const s = state([
+      piece('red', 'explorer', 4, 4),
+      piece('red', 'sentinel', 4, 5), piece('blue', 'sentinel', 5, 4), // in the way north and east
+      piece('blue', 'explorer', 4, 6), // beyond the friendly piece: no leaping onto it either
+    ])
+    const leaps = movesFor(s, s.pieces[0]).filter(m => m.kind === 'leap').map(m => `${m.to.x},${m.to.y}`)
+    expect(leaps.sort()).toEqual(['2,4', '4,2'])
+  })
 })
 
 describe('combat', () => {

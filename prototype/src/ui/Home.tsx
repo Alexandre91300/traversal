@@ -4,8 +4,8 @@ import { generateTerrain } from '../game/terrain'
 import { Board3D } from './Board3D'
 import { ConceptBadge, Icon, Logo } from './bits'
 
-export function Home({ onPlay, onQuickPlay, onComputer, onLearn }: {
-  onPlay: () => void; onQuickPlay: () => void; onComputer: () => void; onLearn: () => void
+export function Home({ onPlay, onQuickPlay, onComputer, onLearn, onOnline }: {
+  onPlay: () => void; onQuickPlay: () => void; onComputer: () => void; onLearn: () => void; onOnline: () => void
 }) {
   const showcase = useMemo(() => newGame(generateTerrain('highlands', 7)), [])
   return (
@@ -32,6 +32,9 @@ export function Home({ onPlay, onQuickPlay, onComputer, onLearn }: {
           </button>
           <button className="btn btn-primary w-full py-4 text-lg flex items-center justify-center gap-2" onClick={onComputer}>
             <Icon name="cpu" size={20} /> Play the computer
+          </button>
+          <button className="btn btn-quiet w-full py-3 flex items-center justify-center gap-2" onClick={onOnline}>
+            <Icon name="globe" /> Play online
           </button>
           <button className="btn btn-quiet w-full py-3 flex items-center justify-center gap-2" onClick={onQuickPlay}>
             <Icon name="users" /> Play a friend on this device

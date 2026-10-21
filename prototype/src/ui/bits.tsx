@@ -11,19 +11,22 @@ export const SIDE_HEX: Record<Side, string> = { red: '#e2563f', blue: '#4b8fe8' 
 export const playerNames = (computer?: Level): Record<Side, string> =>
   computer ? { red: 'You', blue: `Computer · ${LEVELS[computer].name}` } : SIDE_PLAYER
 
-const SHAPES: Record<PieceType, number> = { explorer: 5, vanguard: 4, sentinel: 3 }
+// Side views of the 3D models: needle, wedge, tower, with Strength pips.
+const SILHOUETTES: Record<PieceType, { body: string; pips: [number, number][] }> = {
+  explorer: { body: 'M7.6 19.5h4.8L10.7 6h-1.4z', pips: [[10, 4.4]] },
+  vanguard: { body: 'M2.5 19.5h15v-3.6L2.5 5.5z', pips: [[6.5, 10.6], [11.5, 13.4]] },
+  sentinel: {
+    body: 'M3 19.5h14l-1-11V4h-3v2.5h-1.6V4H8.6v2.5H7V4H4v4.5z',
+    pips: [[7, 12], [10, 12], [13, 12]],
+  },
+}
 
-// Same silhouettes the rules page uses: base sides = Movement.
 export function PieceIcon({ type, side, size = 18 }: { type: PieceType; side: Side; size?: number }) {
-  const n = SHAPES[type]
-  const r = 9
-  const pts = Array.from({ length: n }, (_, i) => {
-    const a = (Math.PI * 2 * i) / n - Math.PI / 2 + (n === 4 ? 0 : 0)
-    return `${10 + r * Math.cos(a)},${10.6 + r * Math.sin(a)}`
-  }).join(' ')
+  const { body, pips } = SILHOUETTES[type]
   return (
     <svg width={size} height={size} viewBox="0 0 20 21" aria-hidden="true" className="shrink-0">
-      <polygon points={pts} fill={SIDE_HEX[side]} stroke="rgb(0 0 0 / 0.45)" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d={body} fill={SIDE_HEX[side]} stroke="rgb(0 0 0 / 0.45)" strokeWidth="1.1" strokeLinejoin="round" />
+      {pips.map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r={type === 'explorer' ? 2 : 1.35} fill="#fff" stroke="rgb(0 0 0 / 0.3)" strokeWidth="0.5" />)}
     </svg>
   )
 }
@@ -69,6 +72,11 @@ const ICONS = {
   users: 'M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
   reset: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
   check: 'M4 12l5 5L20 6',
+  first: 'M6 5v14M18 6l-8 6 8 6z',
+  prev: 'M16 6l-8 6 8 6z',
+  next: 'M8 6l8 6-8 6z',
+  last: 'M18 5v14M6 6l8 6-8 6z',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z',
 }
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) {
