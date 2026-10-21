@@ -76,3 +76,16 @@ _Avoid_: Cross, exit, score
 
 **Game end**:
 The game ends when two Pieces in total (either side) have Finished, or at the move limit; the higher score wins.
+
+## Prototype
+
+**Computer opponent**:
+The prototype's built-in Blue player, at three Levels (Easy, Normal, Hard); the human always plays Red and moves first.
+_Avoid_: Bot, AI player
+
+**Lesson**:
+One step of the Tutorial: a small scripted position where the player learns a single rule by making the move; Blue never replies.
+
+**Tutorial**:
+The ordered sequence of Lessons, from Moving to Winning.
+_Avoid_: Onboarding, walkthrough

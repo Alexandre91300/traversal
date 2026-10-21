@@ -129,7 +129,7 @@ function Status({ state, notice }: { state: GameState; notice: string | null }) 
   )
 }
 
-function Card({ children }: { children: ReactNode }) {
+export function Card({ children }: { children: ReactNode }) {
   return <div className="rounded-lg bg-surface-2/70 border border-line p-3 space-y-2">{children}</div>
 }
 
@@ -163,7 +163,7 @@ function Stat({ label, value }: { label: string; value: number }) {
   )
 }
 
-function MoveCard({ move, piece }: { move: Move; piece: Piece }) {
+export function MoveCard({ move, piece }: { move: Move; piece: Piece }) {
   const s = PIECE_STATS[piece.type]
   const text = move.kind === 'finish' ? `Step off the board and score +${s.strength}.`
     : move.kind === 'leap' ? 'Leap 2 squares straight, ignoring Height. Uses the whole turn.'
@@ -190,7 +190,7 @@ function MovementBar({ used, total }: { used: number; total: number }) {
 }
 
 // The fight broken into its terms, so the outcome is never a surprise.
-function CombatCard({ combat: c, attacker, state }: { combat: Combat; attacker: Piece; state: GameState }) {
+export function CombatCard({ combat: c, attacker, state }: { combat: Combat; attacker: Piece; state: GameState }) {
   const target = state.pieces.find(p => p.id === c.targetId)!
   const sign = (n: number) => (n > 0 ? `+${n}` : String(n))
   const atk: [string, number][] = [

@@ -1,10 +1,15 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { LEVELS, type Level } from '../game/ai'
 import type { PieceType, Side } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
 
 export const SIDE_LABEL: Record<Side, string> = { red: 'Red', blue: 'Blue' }
 export const SIDE_PLAYER: Record<Side, string> = { red: 'Player 1', blue: 'Player 2' }
 export const SIDE_HEX: Record<Side, string> = { red: '#e2563f', blue: '#4b8fe8' }
+
+// Against the computer the human is always Red (see HUMAN in useGame).
+export const playerNames = (computer?: Level): Record<Side, string> =>
+  computer ? { red: 'You', blue: `Computer · ${LEVELS[computer].name}` } : SIDE_PLAYER
 
 const SHAPES: Record<PieceType, number> = { explorer: 5, vanguard: 4, sentinel: 3 }
 
@@ -59,6 +64,11 @@ const ICONS = {
   home: 'M3 11l9-8 9 8M5 10v10h14V10',
   x: 'M6 6l12 12M18 6 6 18',
   play: 'M7 4l13 8-13 8z',
+  learn: 'M22 9 12 4 2 9l10 5 10-5zM6 11v5c3 3 9 3 12 0v-5M22 9v6',
+  cpu: 'M6 6h12v12H6zM10 10h4v4h-4zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4',
+  users: 'M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  reset: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
+  check: 'M4 12l5 5L20 6',
 }
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) {
