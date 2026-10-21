@@ -7,11 +7,10 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { PIECE_STATS, FILES, forward, type GameState, type Move, type Piece, type Pos } from '../game/rules'
 import { SIZE, type Heights } from '../game/terrain'
 import { useT } from '../i18n'
+import { sideTexture, topColor, topTexture } from './textures'
 
 export const HEIGHT_UNIT = 0.32
 const BASE_Y = -0.7
-const LIGHT = '#e6e3c6'
-const DARK = '#6f9a4e'
 const PIECE_COLORS = { red: '#d9432f', blue: '#3a7cdc' }
 
 export type View = 'red' | 'blue' | 'top'
@@ -109,10 +108,13 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
     <>
       <color attach="background" args={['#262420']} />
       <fog attach="fog" args={['#262420', 30, 60]} />
-      <hemisphereLight args={['#fff7e8', '#3a3328', 0.9]} />
+      <hemisphereLight args={['#fff4dc', '#3d4a2c', 0.85]} />
+      {/* Cool fill from the far side so shaded faces keep some shape. */}
+      <directionalLight position={[-8, 6, -6]} intensity={0.35} color="#cfe0ff" />
       <directionalLight
         position={[6, 14, 8]}
-        intensity={1.6}
+        intensity={1.8}
+        color="#fff1d6"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-9}
@@ -131,7 +133,7 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
         smoothTime={0.35}
       />
 
-      <Terrain heights={heights} maxH={maxH} showHeights={!!showHeights} onSquare={p => {
+      <Terrain heights={heights} showHeights={!!showHeights} onSquare={p => {
         const m = moveTo(p)
         if (m) onMove?.(m)
       }} onHoverSquare={p => onHover?.(p ? moveTo(p) ?? null : null)} />
@@ -167,63 +169,57 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
   )
 }
 
-function shade(hex: string, t: number) {
-  const c = new THREE.Color(hex)
-  c.offsetHSL(0, 0, -0.16 + 0.26 * t)
-  return c
-}
+// Each column is earth with a grass (or rock) cap a little wider than it,
+// so Squares read as turf blocks rather than flat-coloured boxes.
+const CAP = 0.07
 
-function Terrain({ heights, maxH, showHeights, onSquare, onHoverSquare }: {
-  heights: Heights; maxH: number; showHeights: boolean
+function Terrain({ heights, showHeights, onSquare, onHoverSquare }: {
+  heights: Heights; showHeights: boolean
   onSquare: (p: Pos) => void; onHoverSquare: (p: Pos | null) => void
 }) {
   const squares = useMemo(() => {
-    const out: { p: Pos; h: number; top: THREE.Material; side: THREE.Material }[] = []
+    const out: { p: Pos; h: number; top: THREE.Material; capSide: THREE.Material; earth: THREE.Material }[] = []
     for (let x = 0; x < SIZE; x++)
       for (let y = 0; y < SIZE; y++) {
         const h = heights[x][y]
-        const baseHex = (x + y) % 2 === 0 ? DARK : LIGHT
-        const col = shade(baseHex, h / maxH)
-        const canvas = document.createElement('canvas')
-        canvas.width = canvas.height = 128
-        const g = canvas.getContext('2d')!
-        g.fillStyle = `#${col.getHexString()}`
-        g.fillRect(0, 0, 128, 128)
-        if (showHeights) {
-          g.fillStyle = (x + y) % 2 === 0 ? 'rgba(255,255,255,0.7)' : 'rgba(40,52,30,0.6)'
-          g.font = '800 30px Montserrat, system-ui, sans-serif'
-          g.textAlign = 'right'
-          g.textBaseline = 'top'
-          g.fillText(String(h), 118, 8)
-        }
-        const tex = new THREE.CanvasTexture(canvas)
-        tex.colorSpace = THREE.SRGBColorSpace
-        tex.anisotropy = 4
-        const top = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 })
-        const side = new THREE.MeshStandardMaterial({ color: col.clone().multiplyScalar(0.62), roughness: 0.9 })
-        out.push({ p: { x, y }, h, top, side })
+        const body = h * HEIGHT_UNIT - BASE_Y - CAP
+        const top = new THREE.MeshStandardMaterial({ map: topTexture(x, y, h, showHeights), roughness: 0.95 })
+        const capSide = new THREE.MeshStandardMaterial({ color: new THREE.Color(...topColor(x, y, h).map(v => v / 255) as [number, number, number]).multiplyScalar(0.72).convertSRGBToLinear(), roughness: 0.95 })
+        const earth = new THREE.MeshStandardMaterial({ map: sideTexture(body), roughness: 1 })
+        out.push({ p: { x, y }, h, top, capSide, earth })
       }
     return out
-  }, [heights, maxH, showHeights])
+  }, [heights, showHeights])
 
   return (
     <group>
-      {squares.map(({ p, h, top, side }) => {
+      {squares.map(({ p, h, top, capSide, earth }) => {
         const [wx, wz] = world(p.x, p.y)
-        const height = h * HEIGHT_UNIT - BASE_Y
+        const surface = h * HEIGHT_UNIT
+        const body = surface - BASE_Y - CAP
         return (
-          <mesh key={`${p.x}-${p.y}`} position={[wx, BASE_Y + height / 2, wz]} castShadow receiveShadow
-            material={[side, side, top, side, side, side]}
+          <group key={`${p.x}-${p.y}`}
             onClick={e => { e.stopPropagation(); onSquare(p) }}
             onPointerOver={e => { e.stopPropagation(); onHoverSquare(p) }}
             onPointerOut={() => onHoverSquare(null)}>
-            <boxGeometry args={[0.985, height, 0.985]} />
-          </mesh>
+            <mesh position={[wx, BASE_Y + body / 2, wz]} castShadow receiveShadow material={earth}>
+              <boxGeometry args={[0.95, body, 0.95]} />
+            </mesh>
+            <mesh position={[wx, surface - CAP / 2, wz]} castShadow receiveShadow
+              material={[capSide, capSide, top, capSide, capSide, capSide]}>
+              <boxGeometry args={[0.99, CAP, 0.99]} />
+            </mesh>
+          </group>
         )
       })}
-      <mesh position={[0, BASE_Y - 0.15, 0]} receiveShadow>
-        <boxGeometry args={[SIZE + 0.6, 0.3, SIZE + 0.6]} />
-        <meshStandardMaterial color="#1b1a17" roughness={1} />
+      {/* Stone plinth with a lighter lip. */}
+      <mesh position={[0, BASE_Y - 0.16, 0]} receiveShadow>
+        <boxGeometry args={[SIZE + 0.7, 0.32, SIZE + 0.7]} />
+        <meshStandardMaterial color="#38332b" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, BASE_Y - 0.015, 0]} receiveShadow>
+        <boxGeometry args={[SIZE + 0.5, 0.03, SIZE + 0.5]} />
+        <meshStandardMaterial color="#4a443a" roughness={0.85} />
       </mesh>
     </group>
   )

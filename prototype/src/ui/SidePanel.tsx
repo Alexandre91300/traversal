@@ -71,7 +71,7 @@ function TabButton({ active, onClick, icon, children }: { active: boolean; onCli
 function ToolButton({ icon, label, onClick, disabled, active }: { icon: Parameters<typeof Icon>[0]['name']; label: string; onClick: () => void; disabled?: boolean; active?: boolean }) {
   return (
     <button onClick={onClick} disabled={disabled} title={label}
-      className={`btn btn-quiet flex flex-col items-center gap-0.5 py-1.5 text-[11px] disabled:opacity-40 disabled:pointer-events-none ${active ? 'ring-1 ring-accent' : ''}`}>
+      className={`btn btn-quiet flex flex-col items-center gap-0.5 py-1.5 px-0.5 text-[11px] min-w-0 truncate disabled:opacity-40 disabled:pointer-events-none ${active ? 'ring-1 ring-accent' : ''}`}>
       <Icon name={icon} size={17} />
       {label}
     </button>
