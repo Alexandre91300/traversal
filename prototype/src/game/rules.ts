@@ -217,7 +217,8 @@ export function apply(s: GameState, m: Move): GameState {
   const score = { ...s.score }
   if (m.kind === 'finish') {
     pieces = pieces.filter(p => p.id !== piece.id)
-    finished = [...finished, piece]
+    // Recorded on the Square it stepped off from, so the UI can animate the exit.
+    finished = [...finished, { ...piece, x: m.to.x, y: m.to.y }]
     score[piece.side] += PIECE_STATS[piece.type].strength
   } else {
     pieces = pieces.map(p => (p.id === piece.id ? { ...p, x: m.to.x, y: m.to.y } : p))

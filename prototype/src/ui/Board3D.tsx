@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { CameraControls, Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
@@ -26,6 +26,7 @@ interface BoardProps {
   showHeights?: boolean
   showCoords?: boolean
   showcase?: boolean
+  highlight?: Pos[] // pulsing Squares, e.g. a tutorial goal
   onPieceClick?: (p: Piece) => void
   onMove?: (m: Move) => void
   onHover?: (m: Move | null) => void
@@ -49,12 +50,13 @@ export function Board3D(props: BoardProps) {
   )
 }
 
-function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, showHeights, showCoords, showcase, onPieceClick, onMove, onHover }: BoardProps) {
+function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, showHeights, showCoords, showcase, highlight = [], onPieceClick, onMove, onHover }: BoardProps) {
   const controls = useRef<CameraControls>(null)
   const { heights } = state
   const maxH = Math.max(1, ...heights.flat())
   const center = (maxH * HEIGHT_UNIT) / 2
   const aspect = useThree(s => s.size.width / s.size.height)
+  const [exits, exitDone] = useExits(state)
 
   useEffect(() => {
     const c = controls.current
@@ -121,6 +123,7 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
       {state.lastMove && <SquareTint heights={heights} p={state.lastMove.from} color="#f5d547" opacity={0.42} />}
       {state.lastMove?.to && <SquareTint heights={heights} p={state.lastMove.to} color="#f5d547" opacity={0.55} />}
       {selected && <SquareTint heights={heights} p={selected} color="#9be15d" opacity={0.6} />}
+      {highlight.map(p => <Pulse key={`${p.x},${p.y}`} heights={heights} p={p} />)}
 
       {hovered && selected && <PathLine heights={heights} from={selected} move={hovered} />}
 
@@ -139,6 +142,8 @@ function Scene({ state, selected, moves = [], hovered, view, viewNonce = 0, show
           }}
           onOver={() => onHover?.(moveTo(p) ?? null)} />
       ))}
+
+      {exits.map(e => <ExitFx key={e.key} exit={e} heights={heights} onDone={() => exitDone(e.key)} />)}
 
       {showCoords && <Coords heights={heights} view={view} />}
       <GoalEdges />
@@ -214,6 +219,20 @@ function SquareTint({ heights, p, color, opacity }: { heights: Heights; p: Pos; 
     <mesh position={[wx, topY(heights, p) + 0.006, wz]} rotation-x={-Math.PI / 2} renderOrder={1}>
       <planeGeometry args={[0.985, 0.985]} />
       <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} />
+    </mesh>
+  )
+}
+
+function Pulse({ heights, p }: { heights: Heights; p: Pos }) {
+  const mat = useRef<THREE.MeshBasicMaterial>(null)
+  useFrame(({ clock }) => {
+    if (mat.current) mat.current.opacity = 0.28 + 0.24 * Math.sin(clock.elapsedTime * 4)
+  })
+  const [wx, wz] = world(p.x, p.y)
+  return (
+    <mesh position={[wx, topY(heights, p) + 0.008, wz]} rotation-x={-Math.PI / 2} renderOrder={1}>
+      <planeGeometry args={[0.985, 0.985]} />
+      <meshBasicMaterial ref={mat} color="#f5d547" transparent opacity={0.4} depthWrite={false} />
     </mesh>
   )
 }
@@ -374,5 +393,103 @@ function GoalEdges() {
         </mesh>
       ))}
     </group>
+  )
+}
+
+// Pieces leaving the board (captured or Finished) linger as short effects
+// instead of vanishing, so the outcome of a move reads at a glance.
+interface Exit { key: string; piece: Piece; kind: 'capture' | 'finish' }
+
+function useExits(state: GameState): [Exit[], (key: string) => void] {
+  const prev = useRef(state)
+  const [exits, setExits] = useState<Exit[]>([])
+  useEffect(() => {
+    // A new board (restart, next lesson) drops any effect still playing.
+    if (state.heights !== prev.current.heights) {
+      prev.current = state
+      return setExits([])
+    }
+    const now = new Set(state.pieces.map(p => p.id))
+    const gone = prev.current.pieces.filter(p => !now.has(p.id))
+    prev.current = state
+    const fresh: Exit[] = []
+    for (const p of gone) {
+      const key = `${p.id}-${state.moves.length}`
+      const done = state.finished.find(f => f.id === p.id)
+      if (done) fresh.push({ key, piece: done, kind: 'finish' })
+      else if (state.captured.some(c => c.id === p.id)) fresh.push({ key, piece: p, kind: 'capture' })
+      // Anything else left through an undo, restart or new lesson: no effect.
+    }
+    setExits(xs => [...xs.filter(x => !now.has(x.piece.id)), ...fresh])
+  }, [state])
+  return [exits, key => setExits(xs => xs.filter(x => x.key !== key))]
+}
+
+const EXIT_SECONDS = 1.2
+
+function ExitFx({ exit, heights, onDone }: { exit: Exit; heights: Heights; onDone: () => void }) {
+  const { piece, kind } = exit
+  const group = useRef<THREE.Group>(null)
+  const mat = useRef<THREE.MeshStandardMaterial>(null)
+  const ring = useRef<THREE.Mesh>(null)
+  const ringMat = useRef<THREE.MeshBasicMaterial>(null)
+  const t = useRef(0)
+  const ended = useRef(false)
+  const [wx, wz] = world(piece.x, piece.y)
+  const ground = topY(heights, piece)
+  const y0 = ground + pieceLift[piece.type]
+  const dir = -forward(piece.side) // world z runs opposite to rank
+  const accent = kind === 'finish' ? '#f5d547' : '#ff6b4a'
+
+  useFrame((_, dt) => {
+    const k = (t.current += dt)
+    const g = group.current
+    if (g && mat.current) {
+      if (kind === 'capture') {
+        // Hold while the attacker lands, flash, then spin down into the ground.
+        const s = k < 0.22 ? 1 : Math.max(0.001, 1 - (k - 0.22) / 0.35)
+        g.scale.setScalar(s)
+        g.position.set(wx, y0 - (1 - s) * 0.3, wz)
+        g.rotation.y = Math.max(0, k - 0.22) * 9
+        mat.current.emissiveIntensity = k > 0.18 && k < 0.45 ? 1.2 : 0
+      } else {
+        // Glide past the goal edge, lifting off and fading.
+        const a = Math.min(1, k / 0.8)
+        const e = a * a * (3 - 2 * a)
+        g.position.set(wx, y0 + e * 0.9, wz + dir * e * 1.3)
+        g.scale.setScalar(1 - e * 0.35)
+        mat.current.opacity = 1 - Math.min(1, Math.max(0, (k - 0.45) / 0.5))
+        mat.current.emissiveIntensity = 0.5 * e
+      }
+    }
+    if (ring.current && ringMat.current) {
+      const r = Math.max(0, Math.min(1, (k - (kind === 'capture' ? 0.22 : 0.5)) / 0.55))
+      ring.current.scale.setScalar(0.4 + r * 1.6)
+      ringMat.current.opacity = r > 0 ? 0.9 * (1 - r) : 0
+    }
+    if (k > EXIT_SECONDS && !ended.current) {
+      ended.current = true
+      onDone()
+    }
+  })
+
+  const ringAt: [number, number, number] = [wx, ground + 0.02, kind === 'capture' ? wz : wz + dir * 0.95]
+  const label = kind === 'finish' ? `+${PIECE_STATS[piece.type].strength}` : 'Captured'
+  return (
+    <>
+      <group ref={group} position={[wx, y0, wz]}>
+        <mesh geometry={geoms[piece.type]} castShadow>
+          <meshStandardMaterial ref={mat} color={PIECE_COLORS[piece.side]} roughness={0.38} metalness={0.15}
+            emissive={kind === 'finish' ? '#f5d547' : '#ffffff'} emissiveIntensity={0} transparent />
+        </mesh>
+      </group>
+      <mesh ref={ring} position={ringAt} rotation-x={-Math.PI / 2} renderOrder={3}>
+        <ringGeometry args={[0.38, 0.48, 40]} />
+        <meshBasicMaterial ref={ringMat} color={accent} transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <Html center position={[ringAt[0], ground + 0.9, ringAt[2]]} wrapperClass="html3d" zIndexRange={[30, 0]}>
+        <div className={`fx-float ${kind === 'finish' ? 'fx-finish' : 'fx-capture'}`}>{label}</div>
+      </Html>
+    </>
   )
 }

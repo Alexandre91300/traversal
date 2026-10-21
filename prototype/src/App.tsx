@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Board3D, type View } from './ui/Board3D'
-import { ConceptBadge, Icon, Logo } from './ui/bits'
+import { ConceptBadge, Icon, Logo, playerNames } from './ui/bits'
 import { Home } from './ui/Home'
 import { GameOverModal, NewGameModal, RulesModal, randomSeed } from './ui/Modals'
 import { PlayerBar } from './ui/PlayerBar'
 import { SidePanel } from './ui/SidePanel'
-import { useGame, type GameSetup, type Settings } from './ui/useGame'
+import { Tutorial } from './ui/Tutorial'
+import { HUMAN, useGame, type GameSetup, type Settings } from './ui/useGame'
 
 type Overlay = 'new' | 'rules' | null
 
 export default function App() {
-  const [screen, setScreen] = useState<'home' | 'play'>('home')
+  const [screen, setScreen] = useState<'home' | 'play' | 'learn'>('home')
   const [overlay, setOverlay] = useState<Overlay>(null)
   const game = useGame({ mode: 'random', seed: randomSeed() })
 
@@ -20,27 +21,38 @@ export default function App() {
     setScreen('play')
   }
 
+  const quick = (computer?: GameSetup['computer']) => start({ mode: 'random', seed: randomSeed(), computer })
+  const learn = () => {
+    setOverlay(null)
+    setScreen('learn')
+  }
+
   return (
     <>
       {screen === 'home'
-        ? <Home onQuickPlay={() => start({ mode: 'random', seed: randomSeed() })} onPlay={() => setOverlay('new')} onRules={() => setOverlay('rules')} />
-        : <PlayScreen game={game} onHome={() => setScreen('home')} onNewGame={() => setOverlay('new')} onRules={() => setOverlay('rules')} onStart={start} />}
-      {overlay === 'new' && <NewGameModal current={game.setup.mode} onStart={start} onClose={() => setOverlay(null)} />}
-      {overlay === 'rules' && <RulesModal onClose={() => setOverlay(null)} />}
+        ? <Home onLearn={learn} onComputer={() => quick('normal')} onQuickPlay={() => quick()} onPlay={() => setOverlay('new')} />
+        : screen === 'learn'
+          ? <Tutorial onExit={() => setScreen('home')} onPlay={quick} />
+          : <PlayScreen game={game} onHome={() => setScreen('home')} onNewGame={() => setOverlay('new')} onRules={() => setOverlay('rules')} onLearn={learn} onStart={start} />}
+      {overlay === 'new' && <NewGameModal current={game.setup} onStart={start} onClose={() => setOverlay(null)} />}
+      {overlay === 'rules' && <RulesModal onClose={() => setOverlay(null)} onLearn={learn} />}
     </>
   )
 }
 
-function PlayScreen({ game, onHome, onNewGame, onRules, onStart }: {
-  game: ReturnType<typeof useGame>; onHome: () => void; onNewGame: () => void; onRules: () => void; onStart: (s: GameSetup) => void
+function PlayScreen({ game, onHome, onNewGame, onRules, onLearn, onStart }: {
+  game: ReturnType<typeof useGame>; onHome: () => void; onNewGame: () => void; onRules: () => void; onLearn: () => void; onStart: (s: GameSetup) => void
 }) {
   const { state } = game
+  const { computer } = game.setup
+  const names = playerNames(computer)
   const [settings, setSettings] = useState<Settings>(() => ({ showHeights: true, showCoords: window.innerWidth >= 1024, autoFlip: false }))
   const [view, setView] = useState<View>('red')
   const [reviewing, setReviewing] = useState(false)
 
   useEffect(() => {
-    if (settings.autoFlip && view !== 'top') setView(state.turn)
+    // Against the computer the board stays on the human's side.
+    if (settings.autoFlip && view !== 'top' && !computer) setView(state.turn)
   }, [state.turn, settings.autoFlip]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (!state.result) setReviewing(false) }, [state.result])
@@ -66,6 +78,7 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onStart }: {
         <button onClick={onHome} className="mb-4 px-2" aria-label="Home"><Logo className="text-[21px]" /></button>
         <RailButton icon="plus" label="New game" onClick={onNewGame} />
         <RailButton icon="book" label="Rules" onClick={onRules} />
+        <RailButton icon="learn" label="Learn" onClick={onLearn} />
         <RailButton icon="home" label="Home" onClick={onHome} />
         <div className="mt-auto px-2 text-center"><ConceptBadge /></div>
       </nav>
@@ -81,7 +94,7 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onStart }: {
         </header>
 
         <section className="flex-1 min-h-0 min-w-0 flex flex-col gap-1 p-1.5 lg:p-0">
-          <PlayerBar state={state} side={far} />
+          <PlayerBar state={state} side={far} name={names[far]} computer={!!computer && far !== HUMAN} thinking={game.thinking} />
           <div className="relative flex-1 min-h-[240px] rounded-lg overflow-hidden bg-[#262420]">
             <Board3D
               state={state}
@@ -107,7 +120,7 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onStart }: {
               </button>
             )}
           </div>
-          <PlayerBar state={state} side={near} />
+          <PlayerBar state={state} side={near} name={names[near]} computer={!!computer && near !== HUMAN} thinking={game.thinking} />
         </section>
 
         <aside className="h-[38dvh] min-h-[300px] lg:min-h-0 lg:h-auto lg:w-[360px] shrink-0 border-t border-line lg:border-0">
@@ -116,14 +129,14 @@ function PlayScreen({ game, onHome, onNewGame, onRules, onStart }: {
       </main>
 
       {state.result && !reviewing && (
-        <GameOverModal state={state} onClose={() => setReviewing(true)} onNewGame={onNewGame}
+        <GameOverModal state={state} computer={computer} onClose={() => setReviewing(true)} onNewGame={onNewGame}
           onRematch={() => onStart({ ...game.setup })} />
       )}
     </div>
   )
 }
 
-function RailButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'home'; label: string; onClick: () => void }) {
+function RailButton({ icon, label, onClick }: { icon: 'plus' | 'book' | 'home' | 'learn'; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="w-[88px] flex flex-col items-center gap-1 py-2.5 rounded-lg text-muted hover:text-fg hover:bg-surface-2 font-display font-bold text-xs">
       <Icon name={icon} size={22} />{label}

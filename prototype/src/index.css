@@ -104,6 +104,48 @@ h1, h2, h3 {
   color: var(--color-muted);
 }
 
+/* Floating callout over a capture or Finish; lives as long as ExitFx. */
+.fx-float {
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 800;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.5);
+  opacity: 0;
+  animation: fx-float 1s ease-out forwards;
+}
+.fx-capture { background: #e2563f; color: #fff; font-size: 12px; padding: 4px 9px; animation-delay: 0.15s; }
+.fx-finish { background: var(--color-gold); color: #2b2310; font-size: 18px; padding: 4px 11px; animation-delay: 0.3s; }
+@keyframes fx-float {
+  0% { opacity: 0; transform: translateY(6px) scale(0.7); }
+  18% { opacity: 1; transform: translateY(0) scale(1.08); }
+  30% { transform: translateY(-2px) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-26px) scale(1); }
+}
+
+.score-pop { animation: score-pop 0.6s ease-out; }
+@keyframes score-pop {
+  0% { transform: scale(1); color: var(--color-fg); }
+  30% { transform: scale(1.55); color: var(--color-gold); }
+  100% { transform: scale(1); color: var(--color-fg); }
+}
+
+.thinking::after {
+  content: '';
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: dots 1.2s steps(1, end) infinite;
+}
+@keyframes dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
